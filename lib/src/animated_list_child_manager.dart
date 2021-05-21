@@ -1,11 +1,4 @@
-import 'dart:collection';
-
-import 'package:flutter/foundation.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/widgets.dart';
-
-import 'animated_list_intervals.dart';
-import 'animated_sliver_list.dart';
+part of 'great_list_view_lib.dart';
 
 //---------------------------------------------------------------------------------------------
 // AnimatedSliverMultiBoxAdaptorElement (RenderObjectElement / Child Manager)
@@ -29,7 +22,8 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   bool _didChangeDependencies = false;
 
   /// additional parameter passed to [AnimatedSliverChildBuilderDelegate.build] method.
-  AnimatedListBuildType buildType = AnimatedListBuildType.UNKNOWN;
+  // ignore: prefer_final_fields
+  AnimatedListBuildType _buildType = AnimatedListBuildType.UNKNOWN;
 
   // list of updates to apply to this render object element in response to one or more changes to the list
   final List<_BuildUpdate> _updates = [];
@@ -94,41 +88,27 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
     }
   }
 
-  Widget? _build(int index) => renderObject.buildAnimatedWidget(this, index);
+  Widget? _build(int index) => renderObject._buildAnimatedWidget(this, index);
 
   final _resizingIntervals = <AnimatedListInterval, double?>{};
 
   /// This method is being called from [AnimatedRenderSliverList] when creating a new interval.
   /// A new entry will be added to the update list and this element will be marked to rebuild.
-  void onUpdateOnNewInterval(AnimatedListInterval interval) {
-    // if (interval.isInRemovingState) {
-    //   _updates.add(_BuildUpdate(
-    //     index: interval.index,
-    //     removeCount: interval.removeCount,
-    //     insertCount: interval.insertCount,
-    //     type: _BuildUpdateType.NEW_REMOVING_INTERVAL,
-    //   ));
-    // } else if (interval.isInResizingState) {
-    //   _updates.add(_BuildUpdate(
-    //     index: interval.index,
-    //     removeCount: interval.removeCount,
-    //     insertCount: interval.insertCount,
-    //     type: _BuildUpdateType.NEW_RESIZING_INTERVAL,
-    //   ));
-    //   _resizingIntervals.putIfAbsent(interval, () => interval.fromSize);
-    // }
-    // markNeedsBuild();
+  void _onUpdateOnNewInterval(AnimatedListInterval interval) {
     _BuildUpdateType type;
     switch (interval.state) {
-      case AnimatedListIntervalState.REMOVING:
+      case _AnimatedListIntervalState.REMOVING:
         type = _BuildUpdateType.NEW_REMOVING_INTERVAL;
         break;
-      case AnimatedListIntervalState.RESIZING:
+      case _AnimatedListIntervalState.RESIZING:
         type = _BuildUpdateType.NEW_RESIZING_INTERVAL;
         _resizingIntervals.putIfAbsent(interval, () => interval.fromSize);
         break;
-      case AnimatedListIntervalState.CHANGING:
+      case _AnimatedListIntervalState.CHANGING:
         type = _BuildUpdateType.NEW_CHANGING_INTERVAL;
+        break;
+      case _AnimatedListIntervalState.INSERTING:
+        type = _BuildUpdateType.RESIZED_TO_INSERTING; // immediate inserting
         break;
       default:
         return;
@@ -145,7 +125,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   /// This method is being called from [AnimatedRenderSliverList] when a removing interval becomes
   /// a resizing interval.
   /// A new entry will be added to the update list and this element will be marked to rebuild.
-  void onUpdateOnIntervalRemovedToResizing(AnimatedListInterval interval) {
+  void _onUpdateOnIntervalRemovedToResizing(AnimatedListInterval interval) {
     _updates.add(_BuildUpdate(
       index: interval.index,
       removeCount: interval.removeCount,
@@ -159,7 +139,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   /// This method is being called from [AnimatedRenderSliverList] when a resizing interval becomes
   /// an inserting interval.
   /// A new entry will be added to the update list and this element will be marked to rebuild.
-  void onUpdateOnIntervalResizedToInserting(AnimatedListInterval interval) {
+  void _onUpdateOnIntervalResizedToInserting(AnimatedListInterval interval) {
     _updates.add(_BuildUpdate(
       index: interval.index,
       removeCount: interval.removeCount,
@@ -172,7 +152,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   /// This method is being called from [AnimatedRenderSliverList] when a resizing interval (without
   /// insertion) completes.
   /// A new entry will be added to the update list and this element will be marked to rebuild.
-  void onUpdateOnIntervalResizedToDisposing(AnimatedListInterval interval) {
+  void _onUpdateOnIntervalResizedToDisposing(AnimatedListInterval interval) {
     _updates.add(_BuildUpdate(
       index: interval.index,
       removeCount: interval.removeCount,
@@ -184,7 +164,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
 
   /// This method is being called from [AnimatedRenderSliverList] when a inserting interval completes.
   /// This element will be marked to rebuild.
-  void onUpdateOnIntervalInsertedToDisposing(AnimatedListInterval interval) {
+  void _onUpdateOnIntervalInsertedToDisposing(AnimatedListInterval interval) {
     _updates.add(_BuildUpdate(
       index: interval.index,
       removeCount: interval.removeCount,
@@ -196,7 +176,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
 
   /// This method is being called from [AnimatedRenderSliverList] when a changing interval completes.
   /// This element will be marked to rebuild.
-  void onUpdateOnIntervalChangedToDisposing(AnimatedListInterval interval) {
+  void _onUpdateOnIntervalChangedToDisposing(AnimatedListInterval interval) {
     _updates.add(_BuildUpdate(
       index: interval.index,
       removeCount: interval.removeCount,
@@ -211,15 +191,15 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   int? _reorderFromIndex, _reorderToIndex;
 
   /// Returns the render box of the dragged visible child element.
-  RenderBox? get reorderDraggedRenderBox =>
+  RenderBox? get _reorderDraggedRenderBox =>
       _reorderDraggedElement?.renderObject as RenderBox?;
 
-  RenderBox? get reorderRemovedChild =>
+  RenderBox? get _reorderRemovedChild =>
       _reorderHiddenElement?.renderObject as RenderBox?;
 
   /// Called by [AnimatedRenderSliverList] after reordering is started.
   /// This element will be marked to rebuild.
-  void onUpdateOnStartReording(int index) {
+  void _onUpdateOnStartReording(int index) {
     markNeedsBuild();
     _reorderFromIndex = index;
     _reorderHiddenElement = _childElements[index];
@@ -229,7 +209,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   /// Called by [AnimatedRenderSliverList] after reordering is completed.
   /// This element will be marked to rebuild or hard rebuild if the move
   /// hasn't been cancelled.
-  void onUpdateOnStopReording(int fromIndex, int? toIndex) {
+  void _onUpdateOnStopReording(int fromIndex, int? toIndex) {
     assert(_reorderFromIndex == fromIndex);
     _reorderingStopUpdate = true;
     _reorderToIndex = toIndex ?? fromIndex;
@@ -244,7 +224,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   /// resizing intervals.
   /// Only the resizing intervals before the specified index are considered.
   /// The sum of these differences is returned.
-  double calculateOffsetCorrection(int firstIndex) {
+  double _calculateOffsetCorrection(int firstIndex) {
     var ret = 0.0;
     for (var entry in _resizingIntervals.entries) {
       final interval = entry.key;
@@ -270,7 +250,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   /// If the calculated size exceedes the [maxSize], an estimate will be returned.
   /// You have to provide a [builder] to build the `i`-th widget and the [childConstraints]
   /// to use to layout it.
-  double measureOffListChildren(int count, double maxSize,
+  double _measureOffListChildren(int count, double maxSize,
       NullableIndexedWidgetBuilder builder, BoxConstraints childConstraints) {
     var size = 0.0;
     int i;
@@ -309,7 +289,6 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   /// has been changed.
   @override
   void performRebuild() {
-    print('performRebuild');
     if (_didChangeDependencies) {
       renderObject.didChangeDependencies(this);
       _didChangeDependencies = false;
@@ -333,7 +312,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
       if (!_reorderingStopUpdate && _reorderFromIndex != null) {
         // create or update the off-list dragged child
         var dragWidget =
-            renderObject.buildDraggedChild(this, _reorderFromIndex!);
+            renderObject._buildDraggedChild(this, _reorderFromIndex!);
         _reorderDraggedElement =
             _createOrUpdateOffListChild(_reorderDraggedElement, dragWidget);
       }
@@ -402,9 +381,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
         var rebuild = newChild == null ||
             (_hardRebuild &&
                 (newChild != _reorderHiddenElement || _reorderingStopUpdate)) ||
-            (newChild != _reorderHiddenElement &&
-                newChild.slot != index &&
-                widget.delegate.rebuildMovedItems);
+            (newChild != _reorderHiddenElement && newChild.slot != index);
         if (rebuild) {
           newChild = updateChild(newChild, _build(index), index);
         } else if (newChild!.slot != index) {
@@ -549,7 +526,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
       const max = kIsWeb
           ? 9007199254740992 // max safe integer on JS (from 0 to this number x != x+1)
           : ((1 << 63) - 1);
-      while (renderObject.callBuildDelegateCallback(
+      while (renderObject._callBuildDelegateCallback(
               this, hi - 1, AnimatedListBuildType.MEASURING) !=
           null) {
         lo = hi - 1;
@@ -568,7 +545,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
       }
       while (hi - lo > 1) {
         final mid = (hi - lo) ~/ 2 + lo;
-        if (renderObject.callBuildDelegateCallback(
+        if (renderObject._callBuildDelegateCallback(
                 this, mid - 1, AnimatedListBuildType.MEASURING) ==
             null) {
           hi = mid;
@@ -579,7 +556,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
       result = lo;
     }
     //""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    return result + 1 + renderObject.intervals.itemCountAdjustment;
+    return result + 1 + renderObject._intervals.itemCountAdjustment;
     //""""""""""""""""""""""""""""""""""""""""""""""""""""""
   }
 
@@ -596,12 +573,12 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   }) {
     final childCount = estimatedChildCount;
     if (childCount == null) return double.infinity;
-    return renderObject.extrapolateMaxScrollOffset(
+    return renderObject._extrapolateMaxScrollOffset(
       firstIndex,
       lastIndex,
       leadingScrollOffset,
       trailingScrollOffset,
-      childCount + renderObject.intervals.itemCountAdjustment,
+      childCount + renderObject._intervals.itemCountAdjustment,
     )!;
   }
 
@@ -822,23 +799,6 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   /// Returns the widget attached to the child element at the specified [index].
   Widget? widgetOf(int? index) =>
       index == null ? null : _childElements[index]?.widget;
-
-  T? stateOf<T extends State<StatefulWidget>>(int index) {
-    var el = _childElements[index];
-    if (el == null) return null;
-    T? fn(Element parent) {
-      T? ret;
-      parent.visitChildElements((element) {
-        if (ret == null && element is StatefulElement && element.state is T) {
-          ret = element.state as T;
-        }
-        ret ??= fn(element);
-      });
-      return ret;
-    }
-
-    return fn(el);
-  }
 
   /// Returns `true` if there are pending updates.
   bool get hasPendingUpdates => _updates.isNotEmpty;

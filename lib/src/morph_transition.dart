@@ -1,6 +1,4 @@
-import 'package:flutter/rendering.dart';
-import 'package:flutter/widgets.dart';
-import 'dart:ui' as ui show Color;
+part of 'great_list_view_lib.dart';
 
 /// Animates a morph effect of two widgets.
 class MorphTransition extends MultiChildRenderObjectWidget {

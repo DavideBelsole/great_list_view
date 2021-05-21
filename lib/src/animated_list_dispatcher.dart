@@ -1,10 +1,4 @@
-import 'dart:async';
-
-import 'package:diffutil_dart/diffutil.dart';
-import 'package:flutter/widgets.dart';
-import 'package:worker_manager/worker_manager.dart';
-
-import 'animated_sliver_list.dart';
+part of 'great_list_view_lib.dart';
 
 typedef AnimatedListDiffItemBuilder<T> = Widget Function(
     BuildContext context, T list, int index, AnimatedListBuildType buildType);
@@ -89,6 +83,8 @@ class AnimatedListDiffDispatcher<T> {
 
     final oldList = _oldList!;
 
+    changeDiffResult(dr, oldList, _currentList);
+
     dr._dispatchUpdatesTo(
       onInsert: (position, count) {
         animatedListController.notifyInsertedRange(position, count);
@@ -118,6 +114,10 @@ class AnimatedListDiffDispatcher<T> {
 
     animatedListController.dispatchChanges();
   }
+
+  void changeDiffResult(_DiffResultDispatcher dr, T oldList, T newList) {}
+
+  bool get hasPendingTask => _processingList != null;
 
   /// Returns the current list to be passed to the [AnimatedSliverList].
   T get currentList => _currentList;
@@ -355,6 +355,102 @@ class _ListAnimatedListDiffComparatorDelegate<T>
   @override
   int lengthOf(List<T> list) => list.length;
 }
+
+//
+
+class PagedListAnimatedListDiffDispatcher<T>
+    extends AnimatedListDiffDispatcher<PagedList<T>> {
+  PagedListAnimatedListDiffDispatcher(
+      {required AnimatedListController animatedListController,
+      required ListAnimatedListDiffItemBuilder<T> itemBuilder,
+      required PagedList<T> currentList,
+      required ListAnimatedListDiffComparator<T> comparator,
+      int spawnNewInsolateCount = _kSpawnNewIsolateCount})
+      : super(
+          animatedListController: animatedListController,
+          initialList: currentList,
+          itemBuilder: (BuildContext context, List<T> list, int index,
+                  AnimatedListBuildType buildType) =>
+              itemBuilder.call(context, list[index], index, buildType),
+          comparator:
+              _PagedListAnimatedListDiffComparatorDelegate<T>(comparator),
+          spawnNewInsolateCount: spawnNewInsolateCount,
+        );
+
+  @override
+  void changeDiffResult(_DiffResultDispatcher dr,
+      covariant PagedList<T> oldList, covariant PagedList<T> newList) {
+    if (oldList.isFullyLoaded || dr._list.isEmpty) return;
+    var first = dr._list.first;
+    if (first.type == _OperationType.INSERT &&
+        first.position >= oldList.length) {
+      dr._list.removeAt(0);
+      animatedListController.markNeedsSoftRefresh();
+    }
+  }
+}
+
+class _PagedListAnimatedListDiffComparatorDelegate<T>
+    extends AnimatedListDiffComparator<PagedList<T>> {
+  final ListAnimatedListDiffComparator<T> comparator;
+
+  _PagedListAnimatedListDiffComparatorDelegate(this.comparator);
+
+  @override
+  bool sameItem(
+          PagedList<T> listA, int indexA, PagedList<T> listB, int indexB) =>
+      comparator.sameItem.call(listA[indexA], listB[indexB]);
+
+  @override
+  bool sameContent(
+          PagedList<T> listA, int indexA, PagedList<T> listB, int indexB) =>
+      comparator.sameContent.call(listA[indexA], listB[indexB]);
+
+  @override
+  int lengthOf(PagedList<T> list) => list.length;
+}
+
+//
+
+class TreeListAnimatedListDiffDispatcher<T>
+    extends AnimatedListDiffDispatcher<TreeListAdapter<T>> {
+  TreeListAnimatedListDiffDispatcher(
+      {required AnimatedListController animatedListController,
+      required ListAnimatedListDiffItemBuilder<T> itemBuilder,
+      required TreeListAdapter<T> currentAdapter,
+      required ListAnimatedListDiffComparator<T> comparator,
+      int spawnNewInsolateCount = _kSpawnNewIsolateCount})
+      : super(
+          animatedListController: animatedListController,
+          initialList: currentAdapter,
+          itemBuilder: (BuildContext context, TreeListAdapter<T> adapter, int index,
+                  AnimatedListBuildType buildType) =>
+              itemBuilder.call(context, adapter.indexToNode(index), index, buildType),
+          comparator: _TreeListAnimatedListDiffComparatorDelegate<T>(comparator),
+          spawnNewInsolateCount: spawnNewInsolateCount,
+        );
+}
+
+class _TreeListAnimatedListDiffComparatorDelegate<T>
+    extends AnimatedListDiffComparator<TreeListAdapter<T>> {
+  final ListAnimatedListDiffComparator<T> comparator;
+  _TreeListAnimatedListDiffComparatorDelegate(this.comparator);
+
+  @override
+  bool sameItem(
+          TreeListAdapter<T> adapterA, int indexA, TreeListAdapter<T> adapterB, int indexB) =>
+      comparator.sameItem.call(adapterA.indexToNode(indexA), adapterB.indexToNode(indexB));
+
+  @override
+  bool sameContent(
+          TreeListAdapter<T> adapterA, int indexA, TreeListAdapter<T> adapterB, int indexB) =>
+      comparator.sameContent.call(adapterA.indexToNode(indexA), adapterB.indexToNode(indexB));
+
+  @override
+  int lengthOf(TreeListAdapter<T> adapter) => adapter.count;
+}
+
+//
 
 _DiffResultDispatcher _calculateDiff<T>(
     T oldList, T newList, AnimatedListDiffComparator<T> comparator) {

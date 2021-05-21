@@ -1,15 +1,22 @@
-import 'dart:math';
-
-import 'package:flutter/widgets.dart';
-import 'animated_sliver_list.dart';
+part of 'great_list_view_lib.dart';
 
 const int _kWindowSize = 3000;
 
 bool _kEquals(dynamic a, dynamic b) => a == b;
 
+typedef TreeItemBuilder<T> = Widget Function(TreeListAdapter<T> adapter,
+    BuildContext context, int idx, AnimatedListBuildType buildType,
+    [dynamic slot]);
+
 /// Adapter that takes a tree model as input and transforms it into a linear list view.
 /// You have to specify the data type `T` representing its nodes.
 class TreeListAdapter<T> {
+  static int _id = 0;
+  int id;
+
+  @override
+  String toString() => id.toString();
+
   final T Function(T node) parentOf;
   final int Function(T node) childrenCount;
   final T Function(T node, int index) childAt;
@@ -65,7 +72,8 @@ class TreeListAdapter<T> {
     this.windowSize = _kWindowSize,
     int? initialCount,
     this.startingLevel = 0,
-  }) : _list = _CircularList(windowSize) {
+  })  : _list = _CircularList(windowSize),
+        id = ++_id {
     if (initialCount != null) {
       assert(initialCount == count);
       _count = initialCount;
@@ -286,9 +294,9 @@ class TreeListAdapter<T> {
   }
 
   /// Call this method when the tree has been completly changed.
-  void notifyTreeChanged(T root, [int? initialCount]) {
+  void notifyTreeChanged([T? root, int? initialCount]) {
     _list.clear();
-    this.root = root;
+    if (root != null) this.root = root;
     _count = -1;
     _offset = 0;
     if (initialCount != null) {
@@ -307,7 +315,8 @@ class TreeListAdapter<T> {
     } else if (from <= _offset && to >= _endOffset) {
       _list.clear();
     } else {
-      _list.remove(max(from, _offset) - _offset, min(to, _endOffset) - _offset);
+      _list.remove(math.max(from, _offset) - _offset,
+          math.min(to, _endOffset) - _offset);
     }
   }
 
@@ -321,7 +330,8 @@ class TreeListAdapter<T> {
     } else if (from <= _offset && to >= _endOffset) {
       _list.clear();
     } else {
-      _list.insert(max(from, _offset) - _offset, min(to, _endOffset) - _offset);
+      _list.insert(math.max(from, _offset) - _offset,
+          math.min(to, _endOffset) - _offset);
     }
   }
 
@@ -492,7 +502,14 @@ class TreeListAdapter<T> {
     final myself = indexToNode(fromIndex);
     assert(isLeaf(myself) || !isNodeExpanded(myself));
 
-    var prevNode = indexToNode((toIndex > fromIndex) ? toIndex : toIndex - 1);
+    late T prevNode;
+    var i = (toIndex > fromIndex) ? toIndex : toIndex - 1;
+    if (i == -1) {
+      assert(!includeRoot);
+      prevNode = root;
+    } else {
+      prevNode = indexToNode(i);
+    }
 
     notifyNodeRemoving(myself, () => removeFn(parentOf(myself), myself));
 
@@ -528,27 +545,34 @@ class TreeListAdapter<T> {
     final myself = indexToNode(fromIndex);
     assert(isLeaf(myself) || !isNodeExpanded(myself));
 
-    var prevNode = indexToNode((toIndex > fromIndex) ? toIndex : toIndex - 1);
+    var i = (toIndex > fromIndex) ? toIndex : toIndex - 1;
+    if (i == -1) {
+      assert(!includeRoot);
+      return Range(0, 1);
+    }
+    var prevNode = indexToNode(i);
 
     int fromLevel, toLevel;
     if (!isLeaf(prevNode) && isNodeExpanded(prevNode)) {
       toLevel = levelOf(prevNode) + 1;
       fromLevel = toLevel;
-      var pNode = parentOf(prevNode);
-      if (fromIndex == toIndex &&
-          childrenCount(prevNode) == 1 &&
-          equals(childAt(prevNode, 0), myself)) {
-        pNode = prevNode;
-        prevNode = myself;
+      if (!isRootNode(prevNode)) {
+        var pNode = parentOf(prevNode);
+        if (fromIndex == toIndex &&
+            childrenCount(prevNode) == 1 &&
+            equals(childAt(prevNode, 0), myself)) {
+          pNode = prevNode;
+          prevNode = myself;
 
-        while (!isRootNode(prevNode) && fromLevel > (includeRoot ? 1 : 0)) {
-          final last = lastChildrenOf(pNode);
-          if (!equals(last, prevNode)) {
-            break;
+          while (!isRootNode(prevNode) && fromLevel > (includeRoot ? 1 : 0)) {
+            final last = lastChildrenOf(pNode);
+            if (!equals(last, prevNode)) {
+              break;
+            }
+            fromLevel--;
+            prevNode = pNode;
+            pNode = parentOf(prevNode);
           }
-          fromLevel--;
-          prevNode = pNode;
-          pNode = parentOf(prevNode);
         }
       }
     } else {
@@ -688,9 +712,5 @@ class Range {
   Range(this.from, this.length);
   bool isIn(int index) => from <= index && index < to;
   @override
-  String toString() => 'Range($from,$to)';
+  String toString() => '[$from,$to)';
 }
-
-typedef TreeItemBuilder<T> = Widget Function(TreeListAdapter<T> adapter,
-    BuildContext context, int idx, AnimatedListBuildType buildType,
-    [dynamic slot]);

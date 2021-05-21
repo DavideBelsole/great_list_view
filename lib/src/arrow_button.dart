@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+part of 'great_list_view_lib.dart';
 
 /// Animated arrow button.
 class ArrowButton extends StatefulWidget {

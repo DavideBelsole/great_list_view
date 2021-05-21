@@ -1,15 +1,4 @@
-import 'dart:async';
-import 'dart:math';
-
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
-import 'package:flutter/widgets.dart';
-
-import 'animated_list_child_manager.dart';
-import 'animated_list_intervals.dart';
-import 'morph_transition.dart';
+part of 'great_list_view_lib.dart';
 
 const _kAnimationSpeed = 500;
 
@@ -82,6 +71,41 @@ enum AnimatedListBuildType {
   UNKNOWN,
 }
 
+class AnimatedListItemInfo {
+  /// the current index of the [AnimatedSliverList].
+  final int listIndex;
+
+  /// the corresponding index of the underlying list, or `null` if there is an interval
+  /// at the [listIndex] position.
+  final int? index;
+
+  /// the amount of visibile part of this item.
+  final double visibleAmount;
+
+  /// the corresponding interval at the [listIndex] position, or `null` if there is
+  /// a normal item at that position (the [index] will be provided in that case).
+  final AnimatedListInterval? interval;
+
+  AnimatedListItemInfo._(
+      this.listIndex, this.index, this.visibleAmount, this.interval);
+
+  /// `true` if this item is visibile, even if only partially.
+  bool get isVisible => visibleAmount > 0.0;
+
+  /// `true` if this item is totally visibile.
+  bool get isTotallyVisible => visibleAmount >= 1.0;
+
+  @override
+  String toString() {
+    var l = <String>[
+      if (index != null) 'index=$index',
+      if (interval != null) 'interval=${interval!.toDebugString()}',
+      if (isVisible) 'visible=${(visibleAmount * 100).toStringAsFixed(0)}%}',
+    ];
+    return '($listIndex) -> ${l.join(', ')}';
+  }
+}
+
 //---------------------------------------------------------------------------------------------
 // AnimatedListController
 //---------------------------------------------------------------------------------------------
@@ -109,7 +133,7 @@ class AnimatedListController {
 
   /// Notify the [AnimatedSliverList] that a new range starting from [from] and [count] long
   /// has been inserted. Call this method after actually you have updated your list.
-  void notifyInsertedRange(final int from, final int count) {
+  void notifyInsertedRange(int from, int count) {
     if (adaptor.isReordering) {
       throw 'Cannot notify changes while reordering. Cancel reordering first';
     }
@@ -120,8 +144,8 @@ class AnimatedListController {
   /// has been removed. Call this method after actually you have updated your list.
   /// A new builder [removeItemBuilder] has to be provided in order to build the removed
   /// items when animating.
-  void notifyRemovedRange(final int from, final int count,
-      final IndexedWidgetBuilder removeItemBuilder) {
+  void notifyRemovedRange(
+      int from, int count, final IndexedWidgetBuilder removeItemBuilder) {
     if (adaptor.isReordering) {
       throw 'Cannot notify changes while reordering. Cancel reordering first';
     }
@@ -133,8 +157,8 @@ class AnimatedListController {
   /// you have updated your list.
   /// A new builder [removeItemBuilder] has to be provided in order to build the replaced
   /// items when animating.
-  void notifyReplacedRange(final int from, final int removeCount,
-      final int insertCount, final IndexedWidgetBuilder removeItemBuilder) {
+  void notifyReplacedRange(int from, int removeCount, final int insertCount,
+      final IndexedWidgetBuilder removeItemBuilder) {
     if (adaptor.isReordering) {
       throw 'Cannot notify changes while reordering. Cancel reordering first';
     }
@@ -146,8 +170,8 @@ class AnimatedListController {
   /// has been modified. Call this method after actually you have updated your list.
   /// A new builder [changeItemBuilder] has to be provided in order to build the old
   /// items when animating.
-  void notifyChangedRange(final int from, final int count,
-      final IndexedWidgetBuilder changeItemBuilder) {
+  void notifyChangedRange(
+      int from, int count, final IndexedWidgetBuilder changeItemBuilder) {
     if (adaptor.isReordering) {
       throw 'Cannot notify changes while reordering. Cancel reordering first';
     }
@@ -164,7 +188,7 @@ class AnimatedListController {
   }
 
   Future<void> cancelReordering() {
-    if ( !adaptor.isReordering ) throw 'It wasn\'t reordering';
+    if (!adaptor.isReordering) throw 'It wasn\'t reordering';
     adaptor._stopReordering(true);
     var completer = Completer();
     WidgetsBinding.instance!.addPostFrameCallback((_) => completer.complete());
@@ -179,6 +203,33 @@ class AnimatedListController {
   /// however in this case all pending animations will be canceled suddenly.
   void markNeedsSoftRefresh() {
     adaptor.childManager.markNeedsSoftRefresh();
+  }
+
+  /// Return the underlying list index of the item with the specified context.
+  /// If the context is not valid or the item is being animated, `null` is returned.
+  /// Call this method if you need to know the extact current index of an item, for example
+  /// in a [GestureDetector.onTap] callback method. The context can be obtained wrapping your widget 
+  /// with a [Builder] widget.
+  int? findIndex(BuildContext context) {
+    var rawGestureDetectorState = (context.findAncestorStateOfType<RawGestureDetectorState>()?.context
+        as StatefulElement?);
+    var slot = rawGestureDetectorState?.slot;
+    if (slot is int) {
+      assert(() {
+        AnimatedSliverMultiBoxAdaptorElement? e;
+        rawGestureDetectorState!.visitAncestorElements((element) {
+          if (element is AnimatedSliverMultiBoxAdaptorElement) {
+            e = element;
+            return false;
+          }
+          return true;
+        });
+        return e != null && e == adaptor.childManager;
+      }());
+      var adj = adaptor._intervals.search(slot);
+      if (adj != null) return slot + adj;
+    }
+    return null;
   }
 }
 
@@ -268,10 +319,13 @@ class DefaultAnimatedListAnimationBuilder
 /// The [updateScrollableWhenResizing] attribute if is set to `false` prevents scroll
 /// listeners for being notified when a resize animation occurs.
 ///
-/// The [coordinateAnimations] attribute if is set to `false` prevents coordination of
-/// animations. If `true` (by default) all animations will follow the following priorities:
-/// intervals in removal state will start first, followed by those in resizing and changing
-/// state, and finally those in inserting state.
+/// The [coordinator] attribute is used to provide a function that coordinates all animations.
+/// You can provide a your own function or the [animatedListImmediateAnimationCoordinator] or
+/// [animatedListDefaultAnimationCoordinator] standard functions.
+///
+/// The [onLayoutChanged] is a callback function called whenever the widget is relayouted.
+/// A list of [AnimatedListItemInfo] is passed to provide detailed information about each
+/// layouted item.
 ///
 /// Set the [reorderable] attribute to `true` to enable to reordering of the list, by
 /// dragging the item to reorder after long touching it.
@@ -281,8 +335,9 @@ class AnimatedSliverList extends SliverWithKeepAliveWidget {
   final AnimatedListAnimationBuilder animationBuilder;
   final AnimatedListAnimationSettings animatedListAnimationSettings;
   final bool updateScrollableWhenResizing;
-  final bool coordinateAnimations;
+  final AnimatedListAnimationCoordinator coordinator;
   final bool reorderable;
+  final void Function(List<AnimatedListItemInfo>)? onLayoutChanged;
 
   const AnimatedSliverList({
     Key? key,
@@ -291,8 +346,9 @@ class AnimatedSliverList extends SliverWithKeepAliveWidget {
     this.animationBuilder = DefaultAnimatedListAnimationBuilder.instance,
     this.animatedListAnimationSettings = const AnimatedListAnimationSettings(),
     this.updateScrollableWhenResizing = true,
-    this.coordinateAnimations = true,
+    this.coordinator = animatedListDefaultAnimationCoordinator,
     this.reorderable = false,
+    this.onLayoutChanged,
   }) : super(key: key);
 
   @override
@@ -317,8 +373,10 @@ class AnimatedRenderSliverList extends RenderSliverList
     implements TickerProvider {
   AnimatedSliverList get widget => childManager.widget;
 
-  final AnimatedListIntervalList intervals = AnimatedListIntervalList();
+  final AnimatedListIntervalList _intervals = AnimatedListIntervalList();
   Set<_WidgetTicker>? _tickers;
+
+  AnimatedListIntervalList get intervals => _intervals;
 
   /// Creates a sliver that places multiple box children in a linear array along
   /// the main axis, taking in account of animations resulting from changes
@@ -332,7 +390,7 @@ class AnimatedRenderSliverList extends RenderSliverList
   /// Updates this render object against a new [AnimatedSliverList] Widget.
   void update(AnimatedSliverList widget) {
     widget.controller!._setAdaptor(this);
-    intervals.clear();
+    _intervals._clear();
     _notifying = false;
     _clearReordering();
     _tickers?.forEach((t) => _removeTicker(t));
@@ -355,7 +413,7 @@ class AnimatedRenderSliverList extends RenderSliverList
   /// Marks this render object to relayout its children when animating
   /// resizing or changing intervals.
   void _markNeedsLayoutIfResizing() {
-    if (intervals.any((interval) =>
+    if (_intervals.any((interval) =>
         interval.isInResizingState || interval.isInChangingState)) {
       markNeedsLayout();
     }
@@ -371,7 +429,7 @@ class AnimatedRenderSliverList extends RenderSliverList
   /// Disposing method that clears all previously created tickers and intervals.
   /// In addition, it releases the [AnimatedListController].
   void dispose() {
-    intervals.clear();
+    _intervals._clear();
     widget.controller?._setAdaptor(null);
     assert(() {
       if (_tickers != null) {
@@ -402,7 +460,7 @@ class AnimatedRenderSliverList extends RenderSliverList
   }
 
   /// This method is responsible for creating the dragged widget during reordering.
-  Widget buildDraggedChild(BuildContext context, int index) {
+  Widget _buildDraggedChild(BuildContext context, int index) {
     return widget.animationBuilder.buildReordering(
         context,
         widget.delegate.builder(
@@ -411,9 +469,9 @@ class AnimatedRenderSliverList extends RenderSliverList
   }
 
   /// This method is responsible for creating the correct widget for a given child's index.
-  Widget? buildAnimatedWidget(BuildContext context, int index) {
+  Widget? _buildAnimatedWidget(BuildContext context, int index) {
     Widget? itemWidget;
-    var adj = intervals.search(
+    var adj = _intervals.search(
       index,
       removeFn: (interval) => itemWidget = AbsorbPointer(
           child: widget.animationBuilder.buildRemoving(
@@ -424,14 +482,14 @@ class AnimatedRenderSliverList extends RenderSliverList
       insertFn: (interval) => itemWidget = AbsorbPointer(
           child: widget.animationBuilder.buildInserting(
         context,
-        defaultInsertItemBuilder(context, index - interval.index, interval),
+        _defaultInsertItemBuilder(context, index - interval.index, interval),
         interval.animation,
       )),
       changeFn: (interval) => itemWidget = AbsorbPointer(
           child: widget.animationBuilder.buildChanging(
         context,
         interval.removeItemBuilder!(context, index - interval.index),
-        defaultInsertItemBuilder(context, index - interval.index, interval),
+        _defaultInsertItemBuilder(context, index - interval.index, interval),
         interval.animation,
       )),
       resizeFn: (interval) => itemWidget = Container(key: ValueKey(interval)),
@@ -442,8 +500,8 @@ class AnimatedRenderSliverList extends RenderSliverList
     index += adj;
 
     /// Create a normal (not animating) widget
-    itemWidget =
-        callBuildDelegateCallback(context, index, AnimatedListBuildType.NORMAL);
+    itemWidget = _callBuildDelegateCallback(
+        context, index, AnimatedListBuildType.NORMAL);
 
     // we insert a invisible boundary item at the end of the list in order to have
     // always an item in the viewport on the borders between this sliver and the next, so
@@ -451,7 +509,7 @@ class AnimatedRenderSliverList extends RenderSliverList
     // an annoying scroll jump due to an estimation error in calculating the size of
     // one or more resizing intervals
     if (itemWidget == null &&
-        callBuildDelegateCallback(
+        _callBuildDelegateCallback(
                 context, index - 1, AnimatedListBuildType.MEASURING) !=
             null) {
       return _BoundaryChild();
@@ -462,9 +520,9 @@ class AnimatedRenderSliverList extends RenderSliverList
 
   /// Delegates the creation of the item Widget to the
   /// [AnimatedSliverChildBuilderDelegate.build] method.
-  Widget? callBuildDelegateCallback(
+  Widget? _callBuildDelegateCallback(
       BuildContext context, int index, AnimatedListBuildType buildType) {
-    childManager.buildType = buildType;
+    childManager._buildType = buildType;
     return widget.delegate.build(context, index);
   }
 
@@ -496,7 +554,7 @@ class AnimatedRenderSliverList extends RenderSliverList
   // then all animations that follow will start.
   void _dispatchChanges() {
     if (!_notifying) return;
-    intervals.optimize();
+    _intervals._optimize();
     _notifying = false;
     _startAnimations();
   }
@@ -507,15 +565,15 @@ class AnimatedRenderSliverList extends RenderSliverList
     int removeCount,
     int insertCount,
     final IndexedWidgetBuilder? removeItemBuilder,
-    final AnimatedListIntervalCreationCallback callback,
+    final _AnimatedListIntervalCreationCallback callback,
     final bool animating,
   ) {
     var adjust = 0;
     var rba = 0;
-    for (var i = 0; i < intervals.length; i++) {
+    for (var i = 0; i < _intervals.length; i++) {
       final to = from + removeCount;
 
-      final interval = intervals[i];
+      final interval = _intervals[i];
       final ifrom = interval.index + adjust;
       final ito = ifrom + interval.insertCount;
 
@@ -526,7 +584,7 @@ class AnimatedRenderSliverList extends RenderSliverList
 
       int adjustInterval(
           int rem, int ins, int leading, int trailing, int rbaAdjust) {
-        return intervals.adjustInterval(
+        return _intervals._adjustInterval(
             interval,
             rem,
             ins,
@@ -546,7 +604,7 @@ class AnimatedRenderSliverList extends RenderSliverList
           // [+++++XXXoo] -> [+++++XXXXX]
           final leading = ifrom - from;
           final rem = removeCount - leading;
-          final ins = min(rem, insertCount);
+          final ins = math.min(rem, insertCount);
           adjustInterval(rem, ins, 0, ito - to, leading);
           insertCount -= ins;
           removeCount -= rem;
@@ -556,7 +614,7 @@ class AnimatedRenderSliverList extends RenderSliverList
           final overlapSize = ito - ifrom;
           final leading = ifrom - from;
           var rem = leading;
-          var ins = min(rem, insertCount);
+          var ins = math.min(rem, insertCount);
           callback(from - adjust, rem, ins,
               _shiftItemBuilder(removeItemBuilder, rba));
           i++;
@@ -564,7 +622,7 @@ class AnimatedRenderSliverList extends RenderSliverList
           insertCount -= ins;
           removeCount -= rem;
           rem = overlapSize;
-          ins = min(rem, insertCount);
+          ins = math.min(rem, insertCount);
           final adj = interval.adjustingItemCount;
           final a = adjustInterval(rem, ins, 0, 0, 0);
           if (a >= 0) {
@@ -585,7 +643,7 @@ class AnimatedRenderSliverList extends RenderSliverList
         } else {
           // [ooXXXX++++++] -> [XXXXXX++++++]
           final rem = ito - from;
-          final ins = min(rem, insertCount);
+          final ins = math.min(rem, insertCount);
           final adj = interval.adjustingItemCount;
           final a = adjustInterval(rem, ins, from - ifrom, 0, 0);
           if (a >= 0) {
@@ -611,8 +669,9 @@ class AnimatedRenderSliverList extends RenderSliverList
   // Creates a new interval in initial removing or resizing status.
   AnimatedListInterval _insertNewInterval(final int from, final int removeCount,
       final int insertCount, final IndexedWidgetBuilder? removeItemBuilder,
-      [final AnimatedListIntervalEventCallback? onDisposed]) {
-    var interval = intervals.insertReplacingInterval(
+      [final _AnimatedListIntervalEventCallback? onDisposed]) {
+    late AnimatedListInterval interval;
+    interval = _intervals._insertReplacingInterval(
       vsync: this,
       animationSettings: widget.animatedListAnimationSettings,
       index: from,
@@ -625,7 +684,7 @@ class AnimatedRenderSliverList extends RenderSliverList
       onCompleted: _onIntervalCompleted,
       onDisposed: onDisposed,
     );
-    childManager.onUpdateOnNewInterval(interval);
+    childManager._onUpdateOnNewInterval(interval);
     return interval;
   }
 
@@ -635,9 +694,9 @@ class AnimatedRenderSliverList extends RenderSliverList
       final int removeCount,
       final int insertCount,
       final IndexedWidgetBuilder? removeItemBuilder,
-      [final AnimatedListIntervalEventCallback? onDisposed]) {
+      [final _AnimatedListIntervalEventCallback? onDisposed]) {
     assert(removeCount == insertCount);
-    var interval = intervals.insertChangingInterval(
+    var interval = _intervals._insertChangingInterval(
       vsync: this,
       animationSettings: widget.animatedListAnimationSettings,
       index: from,
@@ -647,42 +706,42 @@ class AnimatedRenderSliverList extends RenderSliverList
       onCompleted: _onIntervalCompleted,
       onDisposed: onDisposed,
     );
-    childManager.onUpdateOnNewInterval(interval);
+    childManager._onUpdateOnNewInterval(interval);
     return interval;
   }
 
   // Called when interval states change in order to start next animations.
   void _startAnimations() {
     if (!_notifying && !isReordering) {
-      intervals.startAnimations(widget.coordinateAnimations);
+      _intervals._startAnimations(widget.coordinator);
     }
   }
 
   // Called when a removing interval is completed.
   void _onIntervalRemovingCompleted(AnimatedListInterval interval) {
-    childManager.onUpdateOnIntervalRemovedToResizing(interval);
+    childManager._onUpdateOnIntervalRemovedToResizing(interval);
     _startAnimations();
   }
 
   // Called when a resizing interval is completed.
   void _onIntervalResizingCompleted(AnimatedListInterval interval) {
     if (interval.insertCount == 0) {
-      childManager.onUpdateOnIntervalResizedToDisposing(interval);
+      childManager._onUpdateOnIntervalResizedToDisposing(interval);
     } else {
-      childManager.onUpdateOnIntervalResizedToInserting(interval);
+      childManager._onUpdateOnIntervalResizedToInserting(interval);
     }
     _startAnimations();
   }
 
   // Called when a inserting interval is completed.
   void _onIntervalInsertingCompleted(AnimatedListInterval interval) {
-    childManager.onUpdateOnIntervalInsertedToDisposing(interval);
+    childManager._onUpdateOnIntervalInsertedToDisposing(interval);
     _startAnimations();
   }
 
   // Called when a changing interval is completed.
   void _onIntervalChangingCompleted(AnimatedListInterval interval) {
-    childManager.onUpdateOnIntervalChangedToDisposing(interval);
+    childManager._onUpdateOnIntervalChangedToDisposing(interval);
     _startAnimations();
   }
 
@@ -694,16 +753,16 @@ class AnimatedRenderSliverList extends RenderSliverList
   /// The builder used to build the new items that are going to be inserted
   /// within an inserting interval.
   /// The builder picks the item directly from the final changed underlying list.
-  Widget defaultInsertItemBuilder(
+  Widget _defaultInsertItemBuilder(
       BuildContext context, int index, AnimatedListInterval interval) {
     index += interval.index;
-    var i = intervals.indexOf(interval);
+    var i = _intervals.indexOf(interval);
     assert(i >= 0);
     for (var j = 0; j < i; j++) {
-      var prevInterval = intervals[j];
+      var prevInterval = _intervals[j];
       index += prevInterval.adjustingItemCount;
     }
-    return callBuildDelegateCallback(
+    return _callBuildDelegateCallback(
         context, index, AnimatedListBuildType.INSERTING)!;
   }
 
@@ -718,12 +777,12 @@ class AnimatedRenderSliverList extends RenderSliverList
   @override
   RenderBox? childAfter(RenderBox child) {
     if (_inPaint && isReordering) {
-      if (child == childManager.reorderDraggedRenderBox) return null;
+      if (child == childManager._reorderDraggedRenderBox) return null;
       var after = super.childAfter(child);
-      if (after == childManager.reorderRemovedChild) {
+      if (after == childManager._reorderRemovedChild) {
         after = super.childAfter(after!);
       } else {
-        after ??= childManager.reorderDraggedRenderBox;
+        after ??= childManager._reorderDraggedRenderBox;
       }
       return after;
     }
@@ -755,7 +814,7 @@ class AnimatedRenderSliverList extends RenderSliverList
     // measure new resizing intervals
     BoxConstraints? childConstraints;
     double? maxSize;
-    intervals
+    _intervals
         .where((i) =>
             i.isInResizingState && (i.fromSize == null || i.toSize == null))
         .forEach((interval) {
@@ -765,13 +824,13 @@ class AnimatedRenderSliverList extends RenderSliverList
           childConstraints ??= constraints.asBoxConstraints();
           maxSize ??= constraints.viewportMainAxisExtent +
               (parent as RenderViewport).cacheExtent! * 2;
-          interval.measureSizesIfNeeded(
-              () => childManager.measureOffListChildren(interval.removeCount,
+          interval._measureSizesIfNeeded(
+              () => childManager._measureOffListChildren(interval.removeCount,
                   maxSize!, interval.removeItemBuilder!, childConstraints!),
-              () => childManager.measureOffListChildren(
+              () => childManager._measureOffListChildren(
                   interval.insertCount,
                   maxSize!,
-                  (c, i) => defaultInsertItemBuilder(c, i, interval),
+                  (c, i) => _defaultInsertItemBuilder(c, i, interval),
                   childConstraints!));
           assert(interval.fromSize != null && interval.toSize != null);
         });
@@ -781,10 +840,10 @@ class AnimatedRenderSliverList extends RenderSliverList
     var offsetCorrection = _adjustScrollOffset();
 
     // keep always alive the hidden dragged child
-    if (childManager.reorderRemovedChild != null &&
-        !_parentDataOf(childManager.reorderRemovedChild!)!.keepAlive &&
-        !_parentDataOf(childManager.reorderRemovedChild!)!.keptAlive) {
-      _parentDataOf(childManager.reorderRemovedChild!)!.keepAlive = true;
+    if (childManager._reorderRemovedChild != null &&
+        !_parentDataOf(childManager._reorderRemovedChild!)!.keepAlive &&
+        !_parentDataOf(childManager._reorderRemovedChild!)!.keptAlive) {
+      _parentDataOf(childManager._reorderRemovedChild!)!.keepAlive = true;
     }
 
     super.performLayout();
@@ -811,18 +870,18 @@ class AnimatedRenderSliverList extends RenderSliverList
       );
     }
 
-    var resizing = intervals.any((interval) => interval.isInResizingState);
+    var resizing = _intervals.any((interval) => interval.isInResizingState);
 
     if (resizing && !isReordering && widget.updateScrollableWhenResizing) {
-      _notifyScrollable();
+      notifyScrollable();
     }
 
-    if (isReordering && childManager.reorderDraggedRenderBox != null) {
-      childManager.reorderDraggedRenderBox!
+    if (isReordering && childManager._reorderDraggedRenderBox != null) {
+      childManager._reorderDraggedRenderBox!
           .layout(constraints.asBoxConstraints(), parentUsesSize: true);
 
       var currentOffset = currentReorderingChildOffset;
-      _parentDataOf(childManager.reorderDraggedRenderBox!)!.layoutOffset =
+      _parentDataOf(childManager._reorderDraggedRenderBox!)!.layoutOffset =
           currentOffset;
 
       // scroll up/down as needed while dragging
@@ -849,31 +908,48 @@ class AnimatedRenderSliverList extends RenderSliverList
       }
     }
 
-    // if (widget.delegate.onLayoutPerformed != null) {
-    //   int? from, to;
-    //   for (var child = firstChild; child != null; child = childAfter(child)) {
-    //     if (isBoundaryChild(child)) continue;
-    //     var index = _parentDataOf(child)?.index;
-    //     var adj = intervals.search(index);
-    //     if (adj != null) {
-    //       from = index + adj;
-    //       break;
-    //     }
-    //   }
-    //   if (from != null) {
-    //     to = from;
-    //     for (var child = lastChild; child != null; child = childBefore(child)) {
-    //       if (isBoundaryChild(child)) continue;
-    //       var index = _parentDataOf(child)?.index;
-    //       var adj = intervals.search(index);
-    //       if (adj != null) {
-    //         to = index + adj;
-    //         break;
-    //       }
-    //     }
-    //     widget.delegate.onLayoutPerformed.call(from, to);
-    //   }
-    // }
+    widget.onLayoutChanged?.call(layoutInfo);
+  }
+
+  List<AnimatedListItemInfo> get layoutInfo {
+    var list = <AnimatedListItemInfo>[];
+    var viewPortFrom = constraints.scrollOffset;
+    var viewPortTo = viewPortFrom + constraints.viewportMainAxisExtent;
+    for (var child = firstChild; child != null; child = childAfter(child)) {
+      if (isBoundaryChild(child)) break;
+      var index = _parentDataOf(child)!.index!;
+      AnimatedListInterval? interval;
+      interval = null;
+      var adj = intervals.search(
+        index,
+        removeFn: (i) => interval = i,
+        insertFn: (i) => interval = i,
+        changeFn: (i) => interval = i,
+        resizeFn: (i) => interval = i,
+      );
+      var visibleAmount = 0.0;
+      var childFrom = childScrollOffset(child);
+      if (childFrom != null && child.hasSize) {
+        var childTo = childFrom;
+        switch (constraints.axis) {
+          case Axis.horizontal:
+            childTo += child.size.width;
+            break;
+          case Axis.vertical:
+            childTo += child.size.height;
+            break;
+        }
+        if (childTo > viewPortFrom && childFrom < viewPortTo) {
+          visibleAmount = (math.min(childTo, viewPortTo) -
+                  math.max(childFrom, viewPortFrom)) /
+              (childTo - childFrom);
+        }
+      }
+
+      list.add(AnimatedListItemInfo._(
+          index, adj != null ? index + adj : null, visibleAmount, interval));
+    }
+    return list;
   }
 
   // Returns the scroll offset correction that takes into account of the changed
@@ -889,7 +965,7 @@ class AnimatedRenderSliverList extends RenderSliverList
 
     final firstIndex = parentData.index!;
 
-    offsetCorrection = childManager.calculateOffsetCorrection(firstIndex);
+    offsetCorrection = childManager._calculateOffsetCorrection(firstIndex);
 
     if (offsetCorrection != 0.0) {
       final firstOffset = parentData.layoutOffset!;
@@ -931,15 +1007,15 @@ class AnimatedRenderSliverList extends RenderSliverList
   @override
   void visitChildren(visitor) {
     super.visitChildren(visitor);
-    if (childManager.reorderDraggedRenderBox != null) {
+    if (childManager._reorderDraggedRenderBox != null) {
       assert(isReordering);
-      visitor.call(childManager.reorderDraggedRenderBox!);
+      visitor.call(childManager._reorderDraggedRenderBox!);
     }
   }
 
   /// Dispatch a "fake" change to the [ScrollPosition] to force the listeners
   /// (ie a [ScrollBar]) to refresh its state.
-  void _notifyScrollable() {
+  void notifyScrollable() {
     var position = Scrollable.of(childManager)?.widget.controller?.position;
     if (position == null) return;
     ScrollUpdateNotification(
@@ -951,7 +1027,7 @@ class AnimatedRenderSliverList extends RenderSliverList
   }
 
   /// Estimates the max scroll offset based on the rendered viewport data.
-  double? extrapolateMaxScrollOffset(
+  double? _extrapolateMaxScrollOffset(
     final int? firstIndex,
     final int? lastIndex,
     final double? leadingScrollOffset,
@@ -964,7 +1040,7 @@ class AnimatedRenderSliverList extends RenderSliverList
 
     var innerSpace = 0.0, trailingSpace = 0.0;
     var innerCount = 0, trailingCount = 0;
-    for (final interval in intervals) {
+    for (final interval in _intervals) {
       if (!interval.isInResizingState) continue;
       if (firstIndex! <= interval.index) {
         if (interval.index <= lastIndex!) {
@@ -985,7 +1061,7 @@ class AnimatedRenderSliverList extends RenderSliverList
       if (isReordering) {
         // exclude from refied count the zero sized being dragged child
         var i = _reorderPickedIndex;
-        for (final interval in intervals) {
+        for (final interval in _intervals) {
           assert(interval.isInResizingState);
           if (interval.index > i!) break;
           i++;
@@ -1002,7 +1078,7 @@ class AnimatedRenderSliverList extends RenderSliverList
       } else {
         var size = 0.0;
         var count = 0;
-        for (final interval in intervals) {
+        for (final interval in _intervals) {
           if (interval.isInResizingState) {
             if (firstIndex <= interval.index && interval.index <= lastIndex) {
               assert(interval.fromSize != null && interval.toSize != null);
@@ -1025,7 +1101,7 @@ class AnimatedRenderSliverList extends RenderSliverList
   @protected
   double paintExtentOf(final RenderBox child) {
     var parentData = _parentDataOf(child);
-    if (isReordering && child == childManager.reorderRemovedChild) return 0.0;
+    if (isReordering && child == childManager._reorderRemovedChild) return 0.0;
     if (parentData!.index != null) {
       var interval = childManager.intervalAtIndex(indexOf(child));
       if (interval != null && interval.isInResizingState) {
@@ -1047,7 +1123,7 @@ class AnimatedRenderSliverList extends RenderSliverList
   bool get isReordering => _reorderPickedIndex != null;
 
   /// Returns `true` if the list view is animating (that is, one o more intervals exist).
-  bool get isAnimating => intervals.isNotEmpty;
+  bool get isAnimating => _intervals.isNotEmpty;
 
   /// Returns the current offset of the visible dragged item.
   double get currentReorderingChildOffset {
@@ -1060,9 +1136,9 @@ class AnimatedRenderSliverList extends RenderSliverList
   }
 
   void _startReordering(int index, double offsetX, double offsetY) {
-    childManager.onUpdateOnStartReording(index);
+    childManager._onUpdateOnStartReording(index);
 
-    _reorderChildSize = paintExtentOf(childManager.reorderRemovedChild!);
+    _reorderChildSize = paintExtentOf(childManager._reorderRemovedChild!);
 
     _reorderScrollOffset = constraints.scrollOffset;
     _reorderPickedIndex = index;
@@ -1070,9 +1146,9 @@ class AnimatedRenderSliverList extends RenderSliverList
     _reorderDeltaOffset = 0.0;
     _reorderOffsetX = 0.0;
     _reorderStartOffset = _reorderLastOffset =
-        _parentDataOf(childManager.reorderRemovedChild!)!.layoutOffset;
+        _parentDataOf(childManager._reorderRemovedChild!)!.layoutOffset;
 
-    var interval = intervals.insertReorderingInterval(
+    var interval = _intervals._insertReorderingInterval(
       vsync: this,
       animationSettings: widget.animatedListAnimationSettings,
       index: index + 1,
@@ -1080,7 +1156,7 @@ class AnimatedRenderSliverList extends RenderSliverList
       appearing: false,
       onResizingCompleted: _onIntervalResizingCompleted,
     );
-    childManager.onUpdateOnNewInterval(interval);
+    childManager._onUpdateOnNewInterval(interval);
   }
 
   void _updateReordering(double dx, double dy) {
@@ -1107,7 +1183,7 @@ class AnimatedRenderSliverList extends RenderSliverList
       var adj = 0;
       var j = pd.index;
 
-      for (var i in intervals) {
+      for (var i in _intervals) {
         if (i.index == j) {
           return true;
         } else if (i.index > j!) break;
@@ -1191,15 +1267,15 @@ class AnimatedRenderSliverList extends RenderSliverList
     var adj = 0, j = 0;
     var create = true;
 
-    for (var i = 0; i < intervals.length; i++) {
-      var interval = intervals[i];
+    for (var i = 0; i < _intervals.length; i++) {
+      var interval = _intervals[i];
 
       assert(interval.isInResizingState && interval.isReordering);
       if (interval.index != newIndex + adj) {
         if (interval.isWaiting) {
           // the interval is in its full size waiting to be closed...
           // so let's give it the signal
-          interval.startAnimation();
+          interval._startAnimation();
         } else {
           // the interval is animating to reach its full size...
           // let's give the signal to resize to dismiss
@@ -1218,7 +1294,7 @@ class AnimatedRenderSliverList extends RenderSliverList
     }
 
     if (create) {
-      var interval = intervals.insertReorderingInterval(
+      var interval = _intervals._insertReorderingInterval(
         vsync: this,
         animationSettings: widget.animatedListAnimationSettings,
         index: newIndex + j,
@@ -1226,19 +1302,17 @@ class AnimatedRenderSliverList extends RenderSliverList
         appearing: true,
         onResizingCompleted: _onIntervalResizingCompleted,
       );
-      childManager.onUpdateOnNewInterval(interval);
+      childManager._onUpdateOnNewInterval(interval);
     }
   }
 
   void _stopReordering(bool cancel) {
-    intervals.finishReorder();
+    _intervals._finishReorder();
 
-    childManager.onUpdateOnStopReording(
+    childManager._onUpdateOnStopReording(
         _reorderPickedIndex!, cancel ? null : _reorderDropIndex);
 
     _clearReordering();
-
-    print('_stopReordering');
   }
 
   void _clearReordering() {
@@ -1263,7 +1337,7 @@ class AnimatedRenderSliverList extends RenderSliverList
   SliverMultiBoxAdaptorParentData? _parentDataOf(RenderBox child) =>
       child.parentData as SliverMultiBoxAdaptorParentData?;
 
-  String toDebugString() => intervals.toDebugString();
+  String toDebugString() => _intervals.toDebugString();
 }
 
 // Copied from standard package.
@@ -1313,10 +1387,6 @@ int? _kChildCount() => null;
 /// - [onReorderComplete] called at the end of reorder when the move must actually be done;
 ///   the last returned value from [onReorderFeedback] will also be passed; implement this callback
 ///   to update your underlying list; return `false` if you want to cancel the move.
-///
-/// The [rebuildMovedItems] attribute if set to `true` (by default) forces items to be rebuilt
-/// who have changed their position; it is recommended when you store the index inside the widget or
-/// of a closure.
 class AnimatedSliverChildBuilderDelegate extends SliverChildDelegate {
   AnimatedSliverChildBuilderDelegate(
     this.builder, {
@@ -1331,7 +1401,6 @@ class AnimatedSliverChildBuilderDelegate extends SliverChildDelegate {
     this.onReorderFeedback,
     this.onReorderMove,
     this.onReorderComplete,
-    this.rebuildMovedItems = true,
   });
 
   final AnimatedNullableIndexedWidgetBuilder builder;
@@ -1342,7 +1411,6 @@ class AnimatedSliverChildBuilderDelegate extends SliverChildDelegate {
   final int semanticIndexOffset;
   final SemanticIndexCallback semanticIndexCallback;
   final ChildIndexGetter? findChildIndexCallback;
-  final bool rebuildMovedItems;
 
   final bool Function(int index, double dx, double dy)? onReorderStart;
   final dynamic Function(
@@ -1368,7 +1436,7 @@ class AnimatedSliverChildBuilderDelegate extends SliverChildDelegate {
   @override
   Widget? build(BuildContext context, int index) {
     final childManager = context as AnimatedSliverMultiBoxAdaptorElement;
-    final buildType = childManager.buildType;
+    final buildType = childManager._buildType;
     final count = childCount.call();
     if (index < 0 || (count != null && index >= count)) return null;
     Widget? child;
@@ -1477,12 +1545,6 @@ class _SaltedValueKey extends ValueKey<Key> {
   const _SaltedValueKey(Key key) : super(key);
 }
 
-IndexedWidgetBuilder? _shiftItemBuilder(
-    final IndexedWidgetBuilder? builder, final int leading) {
-  if (leading == 0 || builder == null) return builder;
-  return (context, index) => builder.call(context, index + leading);
-}
-
 // Return a Widget for the given Exception (copied from standard package).
 Widget _createErrorWidget(Object exception, StackTrace stackTrace) {
   final details = FlutterErrorDetails(
@@ -1496,5 +1558,5 @@ Widget _createErrorWidget(Object exception, StackTrace stackTrace) {
 }
 
 class _BoundaryChild extends SizedBox {
-  _BoundaryChild() : super.shrink();
+  const _BoundaryChild() : super.shrink();
 }

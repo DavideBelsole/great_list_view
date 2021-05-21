@@ -6,3 +6,7 @@ Initial alpha release. Includes `AnimatedSliverList`, `AnimatedListDiffDispatche
 
 - Bug fixes
 - Null-safety support
+
+## [0.0.10] - 17-05-2021
+
+- fixed worker_manager depedencies error

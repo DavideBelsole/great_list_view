@@ -127,7 +127,6 @@ class _MyListViewState extends State<MyListView> {
                   context, diff.currentList[index], index, buildType);
             },
             childCount: () => diff.currentList.length,
-            rebuildMovedItems: false,
             onReorderStart: (i, dx, dy) => true,
             onReorderMove: (i, j) => true,
             onReorderComplete: (i, j, slot) {

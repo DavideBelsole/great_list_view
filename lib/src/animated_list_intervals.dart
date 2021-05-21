@@ -1,22 +1,58 @@
-import 'dart:collection';
-import 'dart:math';
-
-import 'package:flutter/material.dart';
-
-import 'animated_sliver_list.dart';
+part of 'great_list_view_lib.dart';
 
 typedef AnimatedNullableIndexedWidgetBuilder = Widget? Function(
     BuildContext context, int index, AnimatedListBuildType buildType,
     [dynamic slot]);
 
-typedef AnimatedListIntervalCreationCallback = AnimatedListInterval Function(
+typedef AnimatedListAnimationCoordinator = void Function(
+    Iterator<AnimatedListInterval> Function() iterator,
+    void Function(AnimatedListInterval) startAnimation);
+
+/// All animations start immediately.
+void animatedListImmediateAnimationCoordinator(
+    Iterator<AnimatedListInterval> Function() iterator,
+    void Function(AnimatedListInterval) startAnimation) {
+  var list = iterator();
+  while (list.moveNext()) {
+    startAnimation(list.current);
+  }
+}
+
+/// All animations will follow the following priorities:
+/// intervals in removal state will start first, followed by those in resizing and changing
+/// state, and finally those in inserting state.
+void animatedListDefaultAnimationCoordinator(
+    Iterator<AnimatedListInterval> Function() iterator,
+    void Function(AnimatedListInterval interval) startAnimation) {
+  var state = 4;
+  var list = iterator();
+  while (list.moveNext()) {
+    var i = list.current;
+    if (i.isInRemovingState) {
+      state = math.min(state, 1);
+    } else if (i.isInResizingState || i.isInChangingState) {
+      state = math.min(state, 2);
+    } else if (i.isInInsertingState) state = math.min(state, 3);
+  }
+  list = iterator();
+  while (list.moveNext()) {
+    var i = list.current;
+    if (i.isInRemovingState && state == 1 ||
+        (i.isInResizingState || i.isInChangingState) && state == 2 ||
+        i.isInInsertingState && state == 3) startAnimation(i);
+  }
+}
+
+//
+
+typedef _AnimatedListIntervalCreationCallback = AnimatedListInterval Function(
     int from,
     int newRemoveCount,
     int newInsertCount,
     IndexedWidgetBuilder? removeItemBuilder,
-    [AnimatedListIntervalEventCallback? onDisposed]);
+    [_AnimatedListIntervalEventCallback? onDisposed]);
 
-typedef AnimatedListAnimationItemBuilder = Widget Function(
+typedef _AnimatedListAnimationItemBuilder = Widget Function(
     BuildContext context,
     IndexedWidgetBuilder? oldBuilder,
     int oldIndex,
@@ -54,19 +90,19 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
   /// See [AnimatedListInterval]'s constructor for other details.
   /// This class will handle the entire life cycle of the new interval, adapting to
   /// any change of status by repositioning all its intervals correctly.
-  AnimatedListInterval insertReplacingInterval(
+  AnimatedListInterval _insertReplacingInterval(
       {required TickerProvider vsync,
       required AnimatedListAnimationSettings animationSettings,
       required int index,
       int insertCount = 0,
       int removeCount = 0,
       IndexedWidgetBuilder? removeItemBuilder,
-      AnimatedListIntervalEventCallback? onResizingCompleted,
-      AnimatedListIntervalEventCallback? onRemovingCompleted,
-      AnimatedListIntervalEventCallback? onInsertingCompleted,
-      AnimatedListIntervalEventCallback? onCompleted,
-      AnimatedListIntervalEventCallback? onDisposed}) {
-    var interval = AnimatedListInterval(
+      _AnimatedListIntervalEventCallback? onResizingCompleted,
+      _AnimatedListIntervalEventCallback? onRemovingCompleted,
+      _AnimatedListIntervalEventCallback? onInsertingCompleted,
+      _AnimatedListIntervalEventCallback? onCompleted,
+      _AnimatedListIntervalEventCallback? onDisposed}) {
+    var interval = AnimatedListInterval._(
       vsync: vsync,
       animationSettings: animationSettings,
       index: index,
@@ -108,19 +144,19 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
   }
 
   /// Adds a new changing interval.
-  /// See [AnimatedListInterval.change] constructor for other details.
+  /// See [AnimatedListInterval.._change] constructor for other details.
   /// This class will handle the entire life cycle of the new interval, adapting to
   /// any change of status by repositioning all its intervals correctly.
-  AnimatedListInterval insertChangingInterval(
+  AnimatedListInterval _insertChangingInterval(
       {required TickerProvider vsync,
       required AnimatedListAnimationSettings animationSettings,
       required int index,
       required int changeCount,
       IndexedWidgetBuilder? removeItemBuilder,
-      AnimatedListIntervalEventCallback? onChangingCompleted,
-      AnimatedListIntervalEventCallback? onCompleted,
-      AnimatedListIntervalEventCallback? onDisposed}) {
-    var interval = AnimatedListInterval.change(
+      _AnimatedListIntervalEventCallback? onChangingCompleted,
+      _AnimatedListIntervalEventCallback? onCompleted,
+      _AnimatedListIntervalEventCallback? onDisposed}) {
+    var interval = AnimatedListInterval._change(
       vsync: vsync,
       animationSettings: animationSettings,
       index: index,
@@ -140,19 +176,19 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
   }
 
   /// Adds a new reorder resizing interval.
-  /// See [AnimatedListInterval.reorder] constructor for other details.
+  /// See [AnimatedListInterval.._reorder] constructor for other details.
   /// This class will handle the entire life cycle of the new interval, adapting to
   /// any change of status by repositioning all its intervals correctly.
-  AnimatedListInterval insertReorderingInterval(
+  AnimatedListInterval _insertReorderingInterval(
       {required TickerProvider vsync,
       required AnimatedListAnimationSettings animationSettings,
       required int index,
       required double? size,
       required bool appearing,
-      AnimatedListIntervalEventCallback? onResizingCompleted,
-      AnimatedListIntervalEventCallback? onCompleted,
-      AnimatedListIntervalEventCallback? onDisposed}) {
-    var interval = AnimatedListInterval.reorder(
+      _AnimatedListIntervalEventCallback? onResizingCompleted,
+      _AnimatedListIntervalEventCallback? onCompleted,
+      _AnimatedListIntervalEventCallback? onDisposed}) {
+    var interval = AnimatedListInterval._reorder(
       vsync: vsync,
       animationSettings: animationSettings,
       index: index,
@@ -207,28 +243,10 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
     return n;
   }
 
-  /// Start animations of those intervals that are still in waiting state.
-  /// If [coordinate] is `true`, this method prioritizes the intervals in removal
-  /// state first, then to those in resizing and changing state and finally
-  /// to those in inserting state.
-  void startAnimations(bool coordinate) {
-    if (coordinate) {
-      var state = 4;
-      _list.forEach((i) {
-        if (i.isInRemovingState) {
-          state = min(state, 1);
-        } else if (i.isInResizingState || i.isInChangingState) {
-          state = min(state, 2);
-        } else if (i.isInInsertingState) state = min(state, 3);
-      });
-      _list.forEach((i) {
-        if (i.isInRemovingState && state == 1 ||
-            (i.isInResizingState || i.isInChangingState) && state == 2 ||
-            i.isInInsertingState && state == 3) i.startAnimation();
-      });
-    } else {
-      _list.forEach((i) => i.startAnimation());
-    }
+  /// Start animations of those intervals that are still in waiting state according to
+  /// the provided coordinator.
+  void _startAnimations(AnimatedListAnimationCoordinator coordinator) {
+    coordinator(() => _list.iterator, (i) => i._startAnimation());
   }
 
   /// Scan the list to find the interval below the specified [index].
@@ -244,7 +262,7 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
     var adj = 0;
     for (final interval in _list) {
       switch (interval.state) {
-        case AnimatedListIntervalState.REMOVING:
+        case _AnimatedListIntervalState.REMOVING:
           if (index >= interval.index) {
             if (index < (interval.index + interval.removeCount)) {
               removeFn?.call(interval);
@@ -254,7 +272,7 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
             }
           }
           break;
-        case AnimatedListIntervalState.CHANGING:
+        case _AnimatedListIntervalState.CHANGING:
           if (index >= interval.index) {
             if (index < (interval.index + interval.removeCount)) {
               changeFn?.call(interval);
@@ -264,7 +282,7 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
             }
           }
           break;
-        case AnimatedListIntervalState.RESIZING:
+        case _AnimatedListIntervalState.RESIZING:
           if (index == interval.index) {
             resizeFn?.call(interval);
             return null;
@@ -272,7 +290,7 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
             adj += interval.insertCount - 1;
           }
           break;
-        case AnimatedListIntervalState.INSERTING:
+        case _AnimatedListIntervalState.INSERTING:
           if (index >= interval.index &&
               index < (interval.index + interval.insertCount)) {
             insertFn?.call(interval);
@@ -287,7 +305,7 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
   }
 
   /// Optimize all its intervals, merging some or all of them if possibile.
-  void optimize() {
+  void _optimize() {
     AnimatedListInterval? s, i;
     for (var j = length - 1; j >= 0; j--) {
       i = this[j];
@@ -317,7 +335,7 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
   }
 
   /// Adapt an existing interval in order to comply with the new notification.
-  int adjustInterval(
+  int _adjustInterval(
       AnimatedListInterval interval,
       int newRemoveCount,
       int newInsertCount,
@@ -325,17 +343,17 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
       int trailing,
       AnimatedListAnimationBuilder animationBuilder,
       IndexedWidgetBuilder? removeItemBuilder,
-      AnimatedListIntervalCreationCallback callback,
+      _AnimatedListIntervalCreationCallback callback,
       bool changing) {
     switch (interval.state) {
-      case AnimatedListIntervalState.REMOVING:
+      case _AnimatedListIntervalState.REMOVING:
         interval._insertCount += newInsertCount - newRemoveCount;
         interval._toSize = (interval._insertCount == 0) ? 0.0 : null;
         break;
-      case AnimatedListIntervalState.RESIZING:
+      case _AnimatedListIntervalState.RESIZING:
         interval._insertCount += newInsertCount - newRemoveCount;
         return interval.resize() ? -1 : 0;
-      case AnimatedListIntervalState.INSERTING:
+      case _AnimatedListIntervalState.INSERTING:
         return _splitInterval(
           interval,
           leading,
@@ -349,7 +367,7 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
                 context, newBuilder!.call(context, newIndex), animation);
           },
         );
-      case AnimatedListIntervalState.CHANGING:
+      case _AnimatedListIntervalState.CHANGING:
         if (changing && interval.isWaiting) return 0;
         return _splitInterval(
           interval,
@@ -381,8 +399,8 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
     final int newRemoveCount,
     final int newInsertCount,
     final IndexedWidgetBuilder? itemBuilder,
-    final AnimatedListIntervalCreationCallback newIntervalBuilder,
-    final AnimatedListAnimationItemBuilder animationItemBuilder,
+    final _AnimatedListIntervalCreationCallback newIntervalBuilder,
+    final _AnimatedListAnimationItemBuilder animationItemBuilder,
   ) {
     assert(!interval.isReordering &&
         (interval.isInChangingState || interval.isInInsertingState));
@@ -399,7 +417,7 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
         ? _AnimatedListAnimationController.clone(
             interval.vsync, interval._controller!)
         : null;
-    var other = interval.split(leading, trailing);
+    var other = interval._split(leading, trailing);
     if (other != null) _list.insertSorted(other);
 
     var q = newIntervalBuilder.call(
@@ -419,13 +437,13 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
         orphan?.dispose();
       },
     );
-    if (!w) q.startAnimation();
+    if (!w) q._startAnimation();
 
     return leading == 0 ? 0 : 1;
   }
 
   /// Completes all reorder resizing intervals when the reorder is complete.
-  void finishReorder() {
+  void _finishReorder() {
     while (_list.isNotEmpty) {
       var interval = _list.first;
       assert(interval.isInResizingState && interval.isReordering);
@@ -435,7 +453,7 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
   }
 
   /// Removes all intervals.
-  void clear() {
+  void _clear() {
     _list.forEach((interval) => interval.dispose());
     _list.clear();
   }
@@ -458,7 +476,7 @@ class AnimatedListIntervalList with IterableMixin<AnimatedListInterval> {
 //---------------------------------------------------------------------------------------------
 
 /// A state of an interval.
-enum AnimatedListIntervalState {
+enum _AnimatedListIntervalState {
   /// The interval is removing its covered items from the list.
   REMOVING,
 
@@ -478,19 +496,19 @@ enum AnimatedListIntervalState {
   UNKNOWN,
 }
 
-typedef AnimatedListIntervalEventCallback = void Function(
+typedef _AnimatedListIntervalEventCallback = void Function(
     AnimatedListInterval interval);
 
 /// This class represents a single interval.
 ///
 /// The interval changes its [state] during its life:
-/// An interval arises with the [AnimatedListIntervalState.REMOVING], [AnimatedListIntervalState.RESIZING]
-/// (if no removal is needed) or [AnimatedListIntervalState.CHANGING] state.
-/// A removing interval always goes into the [AnimatedListIntervalState.RESIZING] state.
-/// A resizing interval can go into the [AnimatedListIntervalState.INSERTING] state or directly into the
-/// [AnimatedListIntervalState.DISPOSED] (ie completed) state, if no insertion is needed.
+/// An interval arises with the [_AnimatedListIntervalState.REMOVING], [_AnimatedListIntervalState.RESIZING]
+/// (if no removal is needed) or [_AnimatedListIntervalState.CHANGING] state.
+/// A removing interval always goes into the [_AnimatedListIntervalState.RESIZING] state.
+/// A resizing interval can go into the [_AnimatedListIntervalState.INSERTING] state or directly into the
+/// [_AnimatedListIntervalState.DISPOSED] (ie completed) state, if no insertion is needed.
 /// An inserting interval, as well as a changing interval, always completes into the
-/// [AnimatedListIntervalState.DISPOSED] state.
+/// [_AnimatedListIntervalState.DISPOSED] state.
 ///
 /// The interval takes into account two counts: [removeCount] and [insertCount]. The first indicates how many
 /// items this interval will remove when it is in the removal animation, the latter indicates how many items
@@ -503,15 +521,15 @@ typedef AnimatedListIntervalEventCallback = void Function(
 /// when begin the resize animation, the final size at the end of the animation.
 /// The [currentSize] getter returns the current size based on the animation value.
 /// [fromSize] and/or [toSize] can be (initially or reset to) `null`: that tells the renderer to
-/// measure them when this interval is in the [AnimatedListIntervalState.RESIZING] state.
+/// measure them when this interval is in the [_AnimatedListIntervalState.RESIZING] state.
 ///
 /// Animations won't start immediately. The [isWaiting] getter indicates that the animation is waiting for.
 ///
 /// The [isReordering] getter returns `true` to indicate that this interval is a special resizing interval
 /// used during reordering.
 class AnimatedListInterval extends Comparable {
-  AnimatedListIntervalState _state = AnimatedListIntervalState.UNKNOWN;
-  AnimatedListIntervalState get state => _state;
+  _AnimatedListIntervalState _state = _AnimatedListIntervalState.UNKNOWN;
+  _AnimatedListIntervalState get state => _state;
 
   int _index;
   int get index => _index;
@@ -545,21 +563,21 @@ class AnimatedListInterval extends Comparable {
   IndexedWidgetBuilder? get removeItemBuilder => _removeItemBuilder;
 
   /// Those callbacks are used to listen to all state changes.
-  final AnimatedListIntervalEventCallback? onResizingCompleted,
+  final _AnimatedListIntervalEventCallback? onResizingCompleted,
       onRemovingCompleted,
       onInsertingCompleted,
       onChangingCompleted,
       onCompleted,
       onDisposed;
 
-  bool get isInRemovingState => _state == AnimatedListIntervalState.REMOVING;
-  bool get isInResizingState => _state == AnimatedListIntervalState.RESIZING;
-  bool get isInInsertingState => _state == AnimatedListIntervalState.INSERTING;
-  bool get isInChangingState => _state == AnimatedListIntervalState.CHANGING;
+  bool get isInRemovingState => _state == _AnimatedListIntervalState.REMOVING;
+  bool get isInResizingState => _state == _AnimatedListIntervalState.RESIZING;
+  bool get isInInsertingState => _state == _AnimatedListIntervalState.INSERTING;
+  bool get isInChangingState => _state == _AnimatedListIntervalState.CHANGING;
 
   bool get _needsRemoveItemBuilder =>
-      _state == AnimatedListIntervalState.REMOVING ||
-      _state == AnimatedListIntervalState.CHANGING;
+      _state == _AnimatedListIntervalState.REMOVING ||
+      _state == _AnimatedListIntervalState.CHANGING;
 
   final AnimatedListAnimationSettings animationSettings;
 
@@ -577,10 +595,10 @@ class AnimatedListInterval extends Comparable {
       _waiting ? 0.0 : (_controller?.animationValue ?? 0.0);
 
   /// This constructor creates a replacing interval.
-  /// This interval is being created in the state [AnimatedListIntervalState.REMOVING]
-  /// or [AnimatedListIntervalState.RESIZING] state (if no item should be removed).
+  /// This interval is being created in the state [_AnimatedListIntervalState.REMOVING]
+  /// or [_AnimatedListIntervalState.RESIZING] state (if no item should be removed).
   /// You must also provide a [TickerProvider] and an [AnimatedListAnimationSettings].
-  AnimatedListInterval({
+  AnimatedListInterval._({
     required this.vsync,
     required this.animationSettings,
     required int index,
@@ -606,16 +624,16 @@ class AnimatedListInterval extends Comparable {
     if (_insertCount == 0) _toSize = 0.0;
 
     if (_removeCount > 0) {
-      _changeState(AnimatedListIntervalState.REMOVING);
+      _changeState(_AnimatedListIntervalState.REMOVING);
     } else if (_insertCount > 0) {
-      _changeState(AnimatedListIntervalState.RESIZING);
+      _changeState(_AnimatedListIntervalState.RESIZING);
     }
   }
 
   /// This constructor creates a changing interval.
-  /// This interval is being created in the state [AnimatedListIntervalState.CHANGING].
+  /// This interval is being created in the state [_AnimatedListIntervalState.CHANGING].
   /// You must also provide a [TickerProvider] and an [AnimatedListAnimationSettings].
-  AnimatedListInterval.change({
+  AnimatedListInterval._change({
     required this.vsync,
     required this.animationSettings,
     required int index,
@@ -635,17 +653,17 @@ class AnimatedListInterval extends Comparable {
     _removeCount = changeCount;
     _insertCount = changeCount;
 
-    _changeState(AnimatedListIntervalState.CHANGING);
+    _changeState(_AnimatedListIntervalState.CHANGING);
   }
 
   /// This constructor creates a special resizing interval used during reordering.
-  /// This interval is being created in the state [AnimatedListIntervalState.RESIZING].
+  /// This interval is being created in the state [_AnimatedListIntervalState.RESIZING].
   /// You must also provide a [TickerProvider] and an [AnimatedListAnimationSettings].
   /// You must also provide the [size] of the resizing interval when is fully expanded.
   /// If [appearing] if `true`, the interval is created with size zero and starts
   /// its animation to get to its full size. If `false`, the interval is already created
   /// in its full size and waits for a signal to be collapsed to size zero.
-  AnimatedListInterval.reorder({
+  AnimatedListInterval._reorder({
     required this.vsync,
     required this.animationSettings,
     required int index,
@@ -664,18 +682,18 @@ class AnimatedListInterval extends Comparable {
     if (appearing) {
       _fromSize = 0.0;
       _toSize = size;
-      _changeState(AnimatedListIntervalState.RESIZING);
-      startAnimation();
+      _changeState(_AnimatedListIntervalState.RESIZING);
+      _startAnimation();
     } else {
       _fromSize = size;
       _toSize = 0.0;
-      _changeState(AnimatedListIntervalState.RESIZING);
+      _changeState(_AnimatedListIntervalState.RESIZING);
     }
   }
 
   // This constructor clones an existing interval.
   AnimatedListInterval._clone(AnimatedListInterval interval,
-      [AnimatedListIntervalEventCallback? onDisposed])
+      [_AnimatedListIntervalEventCallback? onDisposed])
       : _state = interval._state,
         _index = interval._index,
         _insertCount = interval._insertCount,
@@ -693,15 +711,15 @@ class AnimatedListInterval extends Comparable {
         onCompleted = interval.onCompleted,
         onDisposed = onDisposed,
         animationSettings = interval.animationSettings {
-    assert(_state != AnimatedListIntervalState.DISPOSED);
+    assert(_state != _AnimatedListIntervalState.DISPOSED);
     if (interval._controller != null) {
       _controller =
           _AnimatedListAnimationController.clone(vsync, interval._controller!);
     }
   }
 
-  void _changeState(AnimatedListIntervalState newState) {
-    assert(_state != AnimatedListIntervalState.DISPOSED);
+  void _changeState(_AnimatedListIntervalState newState) {
+    assert(_state != _AnimatedListIntervalState.DISPOSED);
     _state = newState;
     _waiting = true;
 
@@ -709,12 +727,12 @@ class AnimatedListInterval extends Comparable {
     Curve curve;
     void Function() whenComplete;
     switch (_state) {
-      case AnimatedListIntervalState.REMOVING:
+      case _AnimatedListIntervalState.REMOVING:
         duration = animationSettings.removingDuration;
         curve = animationSettings.removingCurve;
         whenComplete = _onRemovingCompleted;
         break;
-      case AnimatedListIntervalState.RESIZING:
+      case _AnimatedListIntervalState.RESIZING:
         duration = _reordering
             ? animationSettings.reorderingDuration
             : animationSettings.resizingDuration;
@@ -723,12 +741,12 @@ class AnimatedListInterval extends Comparable {
             : animationSettings.resizingCurve;
         whenComplete = _onResizingCompleted;
         break;
-      case AnimatedListIntervalState.INSERTING:
+      case _AnimatedListIntervalState.INSERTING:
         duration = animationSettings.insertingDuration;
         curve = animationSettings.insertingCurve;
         whenComplete = _onInsertingCompleted;
         break;
-      case AnimatedListIntervalState.CHANGING:
+      case _AnimatedListIntervalState.CHANGING:
         duration = animationSettings.changingDuration;
         curve = animationSettings.changingCurve;
         whenComplete = _onChangingCompleted;
@@ -753,20 +771,20 @@ class AnimatedListInterval extends Comparable {
   }
 
   /// Initializes and starts the animation of this interval if it was on hold.
-  void startAnimation() {
+  void _startAnimation() {
     if (!_waiting) return;
     _controller?.start();
     _waiting = false;
   }
 
   void _onRemovingCompleted() {
-    if (_state == AnimatedListIntervalState.DISPOSED) return;
-    _changeState(AnimatedListIntervalState.RESIZING);
+    if (_state == _AnimatedListIntervalState.DISPOSED) return;
+    _changeState(_AnimatedListIntervalState.RESIZING);
     onRemovingCompleted?.call(this);
   }
 
   void _onResizingCompleted() {
-    if (_state == AnimatedListIntervalState.DISPOSED) return;
+    if (_state == _AnimatedListIntervalState.DISPOSED) return;
     if (_reordering) {
       if (_toSize == 0.0) {
         onResizingCompleted?.call(this);
@@ -781,7 +799,7 @@ class AnimatedListInterval extends Comparable {
     } else {
       if (_insertCount > 0) {
         _removeItemBuilder = null;
-        _changeState(AnimatedListIntervalState.INSERTING);
+        _changeState(_AnimatedListIntervalState.INSERTING);
         onResizingCompleted?.call(this);
       } else {
         onResizingCompleted?.call(this);
@@ -791,19 +809,19 @@ class AnimatedListInterval extends Comparable {
   }
 
   void _onInsertingCompleted() {
-    if (_state == AnimatedListIntervalState.DISPOSED) return;
+    if (_state == _AnimatedListIntervalState.DISPOSED) return;
     _onCompleted();
     onInsertingCompleted?.call(this);
   }
 
   void _onChangingCompleted() {
-    if (_state == AnimatedListIntervalState.DISPOSED) return;
+    if (_state == _AnimatedListIntervalState.DISPOSED) return;
     _onCompleted();
     onChangingCompleted?.call(this);
   }
 
   void _onCompleted() {
-    if (_state == AnimatedListIntervalState.DISPOSED) return;
+    if (_state == _AnimatedListIntervalState.DISPOSED) return;
     onCompleted?.call(this);
     dispose(); // completed intervals will be automatically disposed
   }
@@ -812,7 +830,7 @@ class AnimatedListInterval extends Comparable {
   /// to calculate the new size.
   /// Similiarly, if [toSize] is currently `null`, the [toSizeCallback] callback will be invoked
   /// to calculate the new size.
-  void measureSizesIfNeeded(
+  void _measureSizesIfNeeded(
       double Function() fromSizeCallback, double Function() toSizeCallback) {
     _fromSize ??= fromSizeCallback();
     _toSize ??= toSizeCallback();
@@ -840,12 +858,12 @@ class AnimatedListInterval extends Comparable {
   /// Returns the count of items this interval is currently occupying in the [AnimatedSliverList].
   int get buildingItemCount {
     switch (_state) {
-      case AnimatedListIntervalState.REMOVING:
+      case _AnimatedListIntervalState.REMOVING:
         return _removeCount;
-      case AnimatedListIntervalState.RESIZING:
+      case _AnimatedListIntervalState.RESIZING:
         return 1;
-      case AnimatedListIntervalState.INSERTING:
-      case AnimatedListIntervalState.CHANGING:
+      case _AnimatedListIntervalState.INSERTING:
+      case _AnimatedListIntervalState.CHANGING:
         return _insertCount;
       default:
         return 0;
@@ -864,22 +882,22 @@ class AnimatedListInterval extends Comparable {
   String toDebugString() {
     String s;
     switch (_state) {
-      case AnimatedListIntervalState.REMOVING:
+      case _AnimatedListIntervalState.REMOVING:
         s = 'Rm';
         break;
-      case AnimatedListIntervalState.RESIZING:
+      case _AnimatedListIntervalState.RESIZING:
         s = 'Rz';
         break;
-      case AnimatedListIntervalState.INSERTING:
+      case _AnimatedListIntervalState.INSERTING:
         s = 'In';
         break;
-      case AnimatedListIntervalState.CHANGING:
+      case _AnimatedListIntervalState.CHANGING:
         s = 'Ch';
         break;
-      case AnimatedListIntervalState.DISPOSED:
+      case _AnimatedListIntervalState.DISPOSED:
         s = 'Dd';
         break;
-      case AnimatedListIntervalState.UNKNOWN:
+      case _AnimatedListIntervalState.UNKNOWN:
         s = '??';
         break;
     }
@@ -910,7 +928,7 @@ class AnimatedListInterval extends Comparable {
   ///   down to [leading] length and a new cloned [AnimatedListInterval] will be
   ///   created and returned covering the right side; the caller has to create a new
   ///   interval that covers the middle part.
-  AnimatedListInterval? split(int leading, int trailing) {
+  AnimatedListInterval? _split(int leading, int trailing) {
     assert(!isReordering && (isInChangingState || isInInsertingState));
     assert(leading >= 0 && trailing >= 0);
     assert(leading + trailing <= insertCount);
@@ -960,8 +978,8 @@ class AnimatedListInterval extends Comparable {
 
   /// Disposes this interval.
   void dispose() {
-    if (_state == AnimatedListIntervalState.DISPOSED) return;
-    _state = AnimatedListIntervalState.DISPOSED;
+    if (_state == _AnimatedListIntervalState.DISPOSED) return;
+    _state = _AnimatedListIntervalState.DISPOSED;
     if (_controller != null) {
       _controller!.dispose();
       _controller = null;
