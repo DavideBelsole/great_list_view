@@ -10,134 +10,126 @@ The list view is even reorderable.
 
 ```dart
 import 'package:flutter/material.dart';
-
 import 'package:great_list_view/great_list_view.dart';
 import 'package:worker_manager/worker_manager.dart';
 
-void main() async {
-  await Executor().warmUp();
-  runApp(MyApp());
+void main() {
+  Executor().warmUp();
+  runApp(App());
 }
 
-class MyApp extends StatefulWidget {
+class App extends StatefulWidget {
   @override
-  _MyAppState createState() => _MyAppState();
+  _AppState createState() => _AppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _AppState extends State<App> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
         title: 'Test App',
-        theme: ThemeData(
-          primarySwatch: Colors.yellow,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-        ),
         home: SafeArea(
             child: Scaffold(
-          body: AnimatedListExample(),
+          body: Body(key: gkey),
         )));
   }
 }
 
-class MyItem {
-  final int id;
-  final Color color;
-  final double fixedHeight;
-  const MyItem(this.id, [this.color = Colors.blue, this.fixedHeight]);
-}
-
-Widget buildItem(BuildContext context, MyItem item, final bool animating) {
-  return GestureDetector(
-      onTap: click,
-      child: SizedBox(
-          height: item.fixedHeight,
-          child: DecoratedBox(
-              key: !animating ? ValueKey(item) : null,
-              decoration: BoxDecoration(
-                  border: Border.all(color: Colors.black12, width: 0)),
-              child: Container(
-                  color: item.color,
-                  margin: EdgeInsets.all(5),
-                  padding: EdgeInsets.all(15),
-                  child: Center(
-                      child: Text(
-                    "Item ${item.id}",
-                    style: TextStyle(fontSize: 16),
-                  ))))));
-}
-
-List<MyItem> listA = [
-  MyItem(1, Colors.orange),
-  MyItem(2),
-  MyItem(3),
-  MyItem(4),
-  MyItem(5),
-  MyItem(8, Colors.green)
-];
-List<MyItem> listB = [
-  MyItem(2),
-  MyItem(6),
-  MyItem(5, Colors.pink, 100),
-  MyItem(7),
-  MyItem(8, Colors.green)
-];
-
-AnimatedListController controller = AnimatedListController();
-
-final diff = ListAnimatedListDiffDispatcher<MyItem>(
-  animatedListController: controller,
-  currentList: listA,
-  itemBuilder: buildItem,
-  comparator: MyComparator.instance,
-);
-
-class MyComparator extends ListAnimatedListDiffComparator<MyItem> {
-  MyComparator._();
-
-  static MyComparator instance = MyComparator._();
+class Body extends StatefulWidget {
+  Body({Key? key}) : super(key: key);
 
   @override
-  bool sameItem(MyItem a, MyItem b) => a.id == b.id;
-
-  @override
-  bool sameContent(MyItem a, MyItem b) =>
-      a.color == b.color && a.fixedHeight == b.fixedHeight;
+  _BodyState createState() => _BodyState();
 }
 
-bool swapList = true;
+class _BodyState extends State<Body> {
+  late List<ItemData> currentList;
 
-void click() {
-  if (swapList) {
-    diff.dispatchNewList(listB);
-  } else {
-    diff.dispatchNewList(listA);
+  @override
+  void initState() {
+    super.initState();
+    currentList = listA;
   }
-  swapList = !swapList;
-}
 
-class AnimatedListExample extends StatefulWidget {
-  @override
-  _AnimatedListExampleState createState() => _AnimatedListExampleState();
-}
+  void swapList() {
+    setState(() {
+      if (currentList == listA) {
+        currentList = listB;
+      } else {
+        currentList = listA;
+      }
+    });
+  }
 
-class _AnimatedListExampleState extends State<AnimatedListExample> {
   @override
   Widget build(BuildContext context) {
     return Scrollbar(
-        child: CustomScrollView(
-      slivers: <Widget>[
-        AnimatedSliverList(
-          delegate: AnimatedSliverChildBuilderDelegate(
-            (BuildContext context, int index, bool animating) {
-              return buildItem(context, diff.currentList[index], animating);
-            },
-            childCount: () => diff.currentList.length,
-          ),
-          controller: controller,
-        )
-      ],
-    ));
+      child: AutomaticAnimatedListView<ItemData>(
+        list: currentList,
+        comparator: AnimatedListDiffListComparator<ItemData>(
+            sameItem: (a, b) => a.id == b.id,
+            sameContent: (a, b) =>
+                a.color == b.color && a.fixedHeight == b.fixedHeight),
+        itemBuilder: (context, item, data) => data.measuring
+            ? Container(
+                margin: EdgeInsets.all(5), height: item.fixedHeight ?? 60)
+            : Item(data: item),
+        listController: controller,
+        addLongPressReorderable: true,
+        reorderModel: AutomaticAnimatedListReorderModel(currentList),
+      ),
+    );
   }
 }
+
+class Item extends StatelessWidget {
+  final ItemData data;
+
+  const Item({Key? key, required this.data}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+        onTap: () => gkey.currentState?.swapList(),
+        child: AnimatedContainer(
+            height: data.fixedHeight ?? 60,
+            duration: const Duration(milliseconds: 500),
+            margin: EdgeInsets.all(5),
+            padding: EdgeInsets.all(15),
+            decoration: BoxDecoration(
+                color: data.color,
+                border: Border.all(color: Colors.black12, width: 0)),
+            child: Center(
+                child: Text(
+              'Item ${data.id}',
+              style: TextStyle(fontSize: 16),
+            ))));
+  }
+}
+
+class ItemData {
+  final int id;
+  final Color color;
+  final double? fixedHeight;
+  const ItemData(this.id, [this.color = Colors.blue, this.fixedHeight]);
+}
+
+List<ItemData> listA = [
+  ItemData(1, Colors.orange),
+  ItemData(2),
+  ItemData(3),
+  ItemData(4),
+  ItemData(5),
+  ItemData(8, Colors.green)
+];
+List<ItemData> listB = [
+  ItemData(2),
+  ItemData(6),
+  ItemData(5, Colors.pink, 100),
+  ItemData(7),
+  ItemData(8, Colors.yellowAccent)
+];
+
+final controller = AnimatedListController();
+final gkey = GlobalKey<_BodyState>();
 ```

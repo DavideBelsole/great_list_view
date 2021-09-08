@@ -1,143 +1,123 @@
-// ignore: import_of_legacy_library_into_null_safe
-import 'package:worker_manager/worker_manager.dart' show Executor;
+import 'package:flutter/material.dart';
+import 'package:great_list_view/great_list_view.dart';
+import 'package:worker_manager/worker_manager.dart';
 
-void main() async {
-  // ignore: unawaited_futures
+void main() {
   Executor().warmUp();
-  // runApp(MyApp());
+  runApp(App());
 }
 
-// class MyApp extends StatefulWidget {
-//   @override
-//   _MyAppState createState() => _MyAppState();
-// }
+class App extends StatefulWidget {
+  @override
+  _AppState createState() => _AppState();
+}
 
-// class _MyAppState extends State<MyApp> {
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//         title: 'Test App',
-//         theme: ThemeData(
-//           primarySwatch: Colors.yellow,
-//           visualDensity: VisualDensity.adaptivePlatformDensity,
-//         ),
-//         home: SafeArea(
-//             child: Scaffold(
-//           body: MyListView(),
-//         )));
-//   }
-// }
+class _AppState extends State<App> {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+        title: 'Test App',
+        home: SafeArea(
+            child: Scaffold(
+          body: Body(key: gkey),
+        )));
+  }
+}
 
-// class MyItem {
-//   final int id;
-//   final Color color;
-//   final double? fixedHeight;
-//   const MyItem(this.id, [this.color = Colors.blue, this.fixedHeight]);
-// }
+class Body extends StatefulWidget {
+  Body({Key? key}) : super(key: key);
 
-// Widget buildItem(BuildContext context, MyItem item, int index,
-//     AnimatedListBuildType buildType) {
-//   return GestureDetector(
-//       onTap: click,
-//       child: SizedBox(
-//           height: item.fixedHeight,
-//           child: DecoratedBox(
-//               key: buildType == AnimatedListBuildType.NORMAL
-//                   ? ValueKey(item)
-//                   : null,
-//               decoration: BoxDecoration(
-//                   border: Border.all(color: Colors.black12, width: 0)),
-//               child: Container(
-//                   color: item.color,
-//                   margin: EdgeInsets.all(5),
-//                   padding: EdgeInsets.all(15),
-//                   child: Center(
-//                       child: Text(
-//                     'Item ${item.id}',
-//                     style: TextStyle(fontSize: 16),
-//                   ))))));
-// }
+  @override
+  _BodyState createState() => _BodyState();
+}
 
-// List<MyItem> listA = [
-//   MyItem(1, Colors.orange),
-//   MyItem(2),
-//   MyItem(3),
-//   MyItem(4),
-//   MyItem(5),
-//   MyItem(8, Colors.green)
-// ];
-// List<MyItem> listB = [
-//   MyItem(2),
-//   MyItem(6),
-//   MyItem(5, Colors.pink, 100),
-//   MyItem(7),
-//   MyItem(8, Colors.yellowAccent)
-// ];
+class _BodyState extends State<Body> {
+  late List<ItemData> currentList;
 
-// AnimatedListController controller = AnimatedListController();
+  @override
+  void initState() {
+    super.initState();
+    currentList = listA;
+  }
 
-// final diff = ListAnimatedListDiffDispatcherOLD<MyItem>(
-//   animatedListController: controller,
-//   currentList: listA,
-//   itemBuilder: buildItem,
-//   comparator: MyComparator.instance,
-// );
+  void swapList() {
+    setState(() {
+      if (currentList == listA) {
+        currentList = listB;
+      } else {
+        currentList = listA;
+      }
+    });
+  }
 
-// class MyComparator extends ListAnimatedListDiffComparatorOLD<MyItem> {
-//   MyComparator._();
+  @override
+  Widget build(BuildContext context) {
+    return Scrollbar(
+      child: AutomaticAnimatedListView<ItemData>(
+        list: currentList,
+        comparator: AnimatedListDiffListComparator<ItemData>(
+            sameItem: (a, b) => a.id == b.id,
+            sameContent: (a, b) =>
+                a.color == b.color && a.fixedHeight == b.fixedHeight),
+        itemBuilder: (context, item, data) => data.measuring
+            ? Container(
+                margin: EdgeInsets.all(5), height: item.fixedHeight ?? 60)
+            : Item(data: item),
+        listController: controller,
+        addLongPressReorderable: true,
+        reorderModel: AutomaticAnimatedListReorderModel(currentList),
+      ),
+    );
+  }
+}
 
-//   static MyComparator instance = MyComparator._();
+class Item extends StatelessWidget {
+  final ItemData data;
 
-//   @override
-//   bool sameItem(MyItem a, MyItem b) => a.id == b.id;
+  const Item({Key? key, required this.data}) : super(key: key);
 
-//   @override
-//   bool sameContent(MyItem a, MyItem b) =>
-//       a.color == b.color && a.fixedHeight == b.fixedHeight;
-// }
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+        onTap: () => gkey.currentState?.swapList(),
+        child: AnimatedContainer(
+            height: data.fixedHeight ?? 60,
+            duration: const Duration(milliseconds: 500),
+            margin: EdgeInsets.all(5),
+            padding: EdgeInsets.all(15),
+            decoration: BoxDecoration(
+                color: data.color,
+                border: Border.all(color: Colors.black12, width: 0)),
+            child: Center(
+                child: Text(
+              'Item ${data.id}',
+              style: TextStyle(fontSize: 16),
+            ))));
+  }
+}
 
-// bool swapList = true;
+class ItemData {
+  final int id;
+  final Color color;
+  final double? fixedHeight;
+  const ItemData(this.id, [this.color = Colors.blue, this.fixedHeight]);
+}
 
-// void click() {
-//   if (swapList) {
-//     diff.dispatchNewList(listB);
-//   } else {
-//     diff.dispatchNewList(listA);
-//   }
-//   swapList = !swapList;
-// }
+List<ItemData> listA = [
+  ItemData(1, Colors.orange),
+  ItemData(2),
+  ItemData(3),
+  ItemData(4),
+  ItemData(5),
+  ItemData(8, Colors.green)
+];
+List<ItemData> listB = [
+  ItemData(2),
+  ItemData(6),
+  ItemData(5, Colors.pink, 100),
+  ItemData(7),
+  ItemData(8, Colors.yellowAccent)
+];
 
-// class MyListView extends StatefulWidget {
-//   @override
-//   _MyListViewState createState() => _MyListViewState();
-// }
-
-// class _MyListViewState extends State<MyListView> {
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scrollbar(
-//         child: CustomScrollView(
-//       slivers: <Widget>[
-//         AnimatedSliverListOLD(
-//           delegate: AnimatedSliverChildBuilderDelegateOLD(
-//             (BuildContext context, int index, AnimatedListBuildType buildType, [dynamic slot]) {
-//               return buildItem(
-//                   context, diff.currentList[index], index, buildType);
-//             },
-//             childCount: () => diff.currentList.length,
-//             onReorderStart: (i, dx, dy) => true,
-//             onReorderMove: (i, j) => true,
-//             onReorderComplete: (i, j, slot) {
-//               var list = diff.currentList;
-//               var el = list.removeAt(i);
-//               list.insert(j, el);
-//               return true;
-//             },
-//           ),
-//           controller: controller,
-//           reorderable: true,
-//         )
-//       ],
-//     ));
-//   }
-// }
+final controller = AnimatedListController();
+final gkey = GlobalKey<_BodyState>();
