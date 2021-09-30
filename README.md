@@ -36,7 +36,7 @@ Add this to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  great_list_view: ^0.1.0+1
+  great_list_view: ^0.1.1
 ```
 
 and run;
@@ -1543,4 +1543,137 @@ final root = NodeData('Me');
 final rnd = Random();
 final collapsedMap = <NodeData>{};
 final controller = AnimatedListController();
+```
+
+## Additional useful methods
+
+The `AnimatedListController` object provides other useful methods for obtaining information about the placement of items.
+
+The `listToActualItemIndex` and `actualToListItemIndex` methods allow you to convert the index of an item referring to the underlying list to the index of the item actually builded in the list view and vice versa. Obviously the two indices differ only if there are animations in progress.
+
+Another useful method is `computeItemBox` which allows you to retrieve the box position of an item builded in the list view. This method is often used in conjunction with the `jumpTo` and` animateTo` methods of a `ScrollController` to scroll to a certain item.
+
+It is also possible to position at a certain scroll offset when the list view is built for the first time using
+the `initialScrollOffsetCallback` attribute of the `AnimatedSliverChildDelegate`, `AnimatedListView` and `AutomaticAnimatedListView` classes; a callback function has to be passed that is invoked at the first layout of the list view, and it has to return the offset to be positioned at the beginning.
+
+### Example 10 (Scroll To Index)
+
+```dart
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:great_list_view/great_list_view.dart';
+import 'package:worker_manager/worker_manager.dart';
+
+void main() {
+  Executor().warmUp();
+  runApp(App());
+}
+
+class App extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+        title: 'Test App',
+        home: SafeArea(
+            child: Scaffold(
+          body: Body(),
+        )));
+  }
+}
+
+class Body extends StatelessWidget {
+  Body({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scrollbar(
+      child: AutomaticAnimatedListView<ItemData>(
+        list: myList,
+        listController: controller,
+        scrollController: scrollController,
+        comparator: AnimatedListDiffListComparator<ItemData>(
+            sameItem: (a, b) => a.id == b.id,
+            sameContent: (a, b) =>
+                a.color == b.color && a.fixedHeight == b.fixedHeight),
+        itemBuilder: (context, item, data) => data.measuring
+            ? Container(
+                margin: EdgeInsets.all(5), height: item.fixedHeight ?? 60)
+            : Item(data: item),
+        initialScrollOffsetCallback: (c) {
+          final i = rnd.nextInt(myList.length);
+          final box = controller.computeItemBox(i, true);
+          if (box != null) {
+            print('scrolled to item ${myList[i]}');
+            return max(
+                0.0, box.top - (c.viewportMainAxisExtent - box.height) / 2.0);
+          }
+        },
+      ),
+    );
+  }
+}
+
+final rnd = Random();
+
+class Item extends StatelessWidget {
+  final ItemData data;
+
+  const Item({Key? key, required this.data}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+        onTap: () {
+          final listIndex = rnd.nextInt(myList.length);
+          final actualIndex = controller.listToActualItemIndex(listIndex);
+          if (actualIndex == null) return;
+          final box = controller.computeItemBox(actualIndex);
+          if (box == null) return;
+          print('scrolled to item ${myList[listIndex]}');
+          final c = context
+              .findAncestorRenderObjectOfType<RenderSliver>()!
+              .constraints;
+          final r = box.top - (c.viewportMainAxisExtent - box.height) / 2.0;
+          scrollController.animateTo(r,
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeIn);
+        },
+        child: AnimatedContainer(
+            height: data.fixedHeight ?? 60,
+            duration: const Duration(milliseconds: 500),
+            margin: EdgeInsets.all(5),
+            padding: EdgeInsets.all(15),
+            decoration: BoxDecoration(
+                color: data.color,
+                border: Border.all(color: Colors.black12, width: 0)),
+            child: Center(
+                child: Text(
+              'Item ${data.id}',
+              style: TextStyle(fontSize: 16),
+            ))));
+  }
+}
+
+class ItemData {
+  final int id;
+  final Color color;
+  final double? fixedHeight;
+  const ItemData(this.id, [this.color = Colors.blue, this.fixedHeight]);
+  @override
+  String toString() => '$id';
+}
+
+int n = 0;
+
+List<ItemData> myList = [
+  for (n = 1; n <= 10; n++) ItemData(n, Colors.blue, 60),
+  for (; n <= 20; n++) ItemData(n, Colors.orange, 80),
+  for (; n <= 30; n++) ItemData(n, Colors.yellow, 45),
+  for (; n <= 40; n++) ItemData(n, Colors.red, 120),
+];
+
+final controller = AnimatedListController();
+final scrollController = ScrollController();
 ```

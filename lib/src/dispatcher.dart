@@ -257,7 +257,8 @@ class _Operation {
 }
 
 class _DiffResultDispatcher {
-  int? _removedPosition, _removedCount;
+  int? _removedPosition, _changedPosition;
+  int _removedCount = 0, _changedCount = 0;
   final List<_Operation> _list = [];
 
   _DiffResultDispatcher(final DiffResult diffResult) {
@@ -265,50 +266,62 @@ class _DiffResultDispatcher {
     for (final u in upd) {
       u.when(
         change: (position, payload) {
-          _pushPendingRemoved();
-          _list.add(_Operation(
-              type: _OperationType.CHANGE, position: position, count1: 1));
+          if (_changedPosition != null &&
+              position == _changedPosition! - _changedCount) {
+            _changedCount++;
+          } else {
+            _pushPendings();
+            _changedPosition = position;
+            _changedCount = 1;
+          }
         },
         insert: (position, count) {
           if (position == _removedPosition) {
             _list.add(_Operation(
                 type: _OperationType.REPLACE,
                 position: position,
-                count1: _removedCount!,
+                count1: _removedCount,
                 count2: count));
             _removedPosition = null;
           } else {
-            _pushPendingRemoved();
+            _pushPendings();
             _list.add(_Operation(
                 type: _OperationType.INSERT,
                 position: position,
                 count1: count));
           }
         },
-        move: (from, to) {
-          throw 'operation noy supported yet!';
-        },
         remove: (position, count) {
-          _pushPendingRemoved();
+          _pushPendings();
           _removedPosition = position;
           _removedCount = count;
+        },
+        move: (from, to) {
+          throw 'operation noy supported yet!';
         },
       );
     }
 
-    _pushPendingRemoved();
+    _pushPendings();
   }
 
   @override
   String toString() => _list.toString();
 
-  void _pushPendingRemoved() {
+  void _pushPendings() {
     if (_removedPosition != null) {
       _list.add(_Operation(
           type: _OperationType.REMOVE,
           position: _removedPosition!,
-          count1: _removedCount!));
+          count1: _removedCount));
       _removedPosition = null;
+    }
+    if (_changedPosition != null) {
+      _list.add(_Operation(
+          type: _OperationType.CHANGE,
+          position: _changedPosition! - _changedCount + 1,
+          count1: _changedCount));
+      _changedPosition = null;
     }
   }
 

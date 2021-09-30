@@ -115,7 +115,26 @@ mixin AnimatedRenderSliverMultiBoxAdaptor
         .dispatch(context);
   }
 
+  bool _initScrollPosition = true;
+
   void doPerformLayout(void Function() callback) {
+    if (_initScrollPosition) {
+      _initScrollPosition = false;
+      final callback = childManager.widget.delegate.initialScrollOffsetCallback;
+      if (callback != null) {
+        double? offset;
+        invokeLayoutCallback<SliverConstraints>(
+            (SliverConstraints constraints) {
+          offset = callback.call(constraints);
+        });
+        if (offset != null && constraints.scrollOffset != offset) {
+          geometry = SliverGeometry(
+              scrollOffsetCorrection: offset! - constraints.scrollOffset);
+          return;
+        }
+      }
+    }
+
     _adjustLayout();
 
     callback();
@@ -154,12 +173,12 @@ mixin AnimatedRenderSliverMultiBoxAdaptor
     return _childAfter(child);
   }
 
-  void doPaint(PaintingContext context, Offset offset, void Function() callback) {
+  void doPaint(
+      PaintingContext context, Offset offset, void Function() callback) {
     _inPaint = true;
     callback();
     _inPaint = false;
   }
-
 
   void doVisitChildren(RenderObjectVisitor visitor, void Function() callback) {
     callback();
@@ -177,12 +196,12 @@ mixin AnimatedRenderSliverMultiBoxAdaptor
 
   var _reorderMainAxisLocalOffset = 0.0;
   var _reorderCrossAxisLocalOffset = 0.0;
-  
+
   var _reorderOriginScrollOffset = 0.0;
-  
+
   var _reorderOriginMainAxisOffset = 0.0;
   var _reorderOriginCrossAxisOffset = 0.0;
-  
+
   var _reorderCurrentMainAxisOffset = 0.0;
   var _reorderLastMainAxisOffset = 0.0;
 
@@ -289,11 +308,11 @@ mixin AnimatedRenderSliverMultiBoxAdaptor
       _slot = newSlot;
 
       childManager.notifyChangedRange(
-        pickIndex,
-        1,
-        (context, index, data) => childManager.widget.delegate
-            .builder(context, _intervalList.reorderPickListIndex!, data),
-      );
+          pickIndex,
+          1,
+          (context, index, data) => childManager.widget.delegate
+              .builder(context, _intervalList.reorderPickListIndex!, data),
+          0);
     }
 
     markNeedsLayout();
@@ -397,9 +416,10 @@ mixin AnimatedRenderSliverMultiBoxAdaptor
     var dropIndex = _intervalList.reorderDropListIndex(pickIndex);
 
     final delegate = childManager.widget.delegate;
-    if (cancel || !(delegate.reorderModel?.onReorderComplete
-            .call(pickIndex, dropIndex, _slot) ??
-        false)) {
+    if (cancel ||
+        !(delegate.reorderModel?.onReorderComplete
+                .call(pickIndex, dropIndex, _slot) ??
+            false)) {
       dropIndex = pickIndex;
     }
 
@@ -515,6 +535,8 @@ mixin AnimatedRenderSliverMultiBoxAdaptor
       }
     }
   }
+
+  Rect? _computeItemBox(int buildIndex, bool absolute);
 }
 
 // This class extends the original RenderSliverList to add support for animation and
@@ -633,6 +655,72 @@ class AnimatedRenderSliverList extends RenderSliverList
 
   @override
   void performLayout() => doPerformLayout(() => super.performLayout());
+
+  @override
+  Rect? _computeItemBox(int buildIndex, bool absolute) {
+    if (buildIndex < 0 || buildIndex >= _intervalList.buildItemCount) {
+      return null;
+    }
+    final firstChild = firstChildWithLayout;
+    var r = 0.0;
+    var s = 0.0;
+    if (firstChild == null) {
+      for (var i = 0; i < buildIndex; i++) {
+        final widget = childManager._build(i, true);
+        if (widget == null) return null;
+        r += measureItem(widget);
+      }
+      final widget = childManager._build(buildIndex, true);
+      if (widget == null) return null;
+      s = measureItem(widget);
+    } else {
+      s = childSize(firstChild);
+      final parentData = parentDataOf(firstChild)!;
+      var i = parentData.index!;
+      r = parentData.layoutOffset!;
+      if (buildIndex <= i) {
+        while (buildIndex < i) {
+          final widget = childManager._build(--i, true);
+          if (widget == null) return null;
+          s = measureItem(widget);
+          r -= s;
+        }
+      } else {
+        var child = firstChild;
+        while (buildIndex > i) {
+          final nextChild = childAfter(child);
+          if (nextChild == null) break;
+          final parentData = parentDataOf(nextChild)!;
+          if (parentData.layoutOffset == null) break;
+          child = nextChild;
+          i = parentData.index!;
+          r = parentData.layoutOffset!;
+        }
+        s = childSize(child);
+        if (buildIndex > i) {
+          i++;
+          r += s;
+          while (buildIndex > i) {
+            final widget = childManager._build(i++, true);
+            if (widget == null) return null;
+            r += measureItem(widget);
+          }
+          final widget = childManager._build(buildIndex, true);
+          if (widget == null) return null;
+          s = measureItem(widget);
+        }
+      }
+    }
+    if (absolute) {
+      r += constraints.precedingScrollExtent;
+    }
+    switch (constraints.axis) {
+      case Axis.horizontal:
+        return Rect.fromLTWH(r, 0, s, constraints.crossAxisExtent);
+      case Axis.vertical:
+        return Rect.fromLTWH(0, r, constraints.crossAxisExtent, s);
+    }
+  }
 }
 
 /// This class extends the original [RenderSliverFixedExtentList] to add support for
@@ -980,5 +1068,22 @@ class AnimatedRenderSliverFixedExtentList extends RenderSliverFixedExtentList
       walker = childBefore(walker);
     }
     return trailingGarbage;
+  }
+
+  @override
+  Rect? _computeItemBox(int buildIndex, bool absolute) {
+    if (buildIndex < 0 || buildIndex >= _intervalList.buildItemCount) {
+      return null;
+    }
+    var r = itemExtent * buildIndex;
+    if (absolute) {
+      r += constraints.precedingScrollExtent;
+    }
+    switch (constraints.axis) {
+      case Axis.horizontal:
+        return Rect.fromLTWH(r, 0, itemExtent, constraints.crossAxisExtent);
+      case Axis.vertical:
+        return Rect.fromLTWH(0, r, constraints.crossAxisExtent, itemExtent);
+    }
   }
 }

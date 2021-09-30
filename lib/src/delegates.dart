@@ -32,6 +32,8 @@ abstract class AnimatedSliverChildDelegate {
   /// Provides a model (a bunch of callbacks) to handle reorders.
   AnimatedListBaseReorderModel? get reorderModel;
 
+  InitialScrollOffsetCallback? get initialScrollOffsetCallback;
+
   @override
   String toString() {
     final description = <String>[];
@@ -93,6 +95,9 @@ class AnimatedSliverChildBuilderDelegate extends AnimatedSliverChildDelegate {
 
   final Duration morphDuration;
 
+  @override
+  final InitialScrollOffsetCallback? initialScrollOffsetCallback;
+
   /// Provides a model (a bunch of callbacks) to handle reorders.
   /// If `null` the list view cannot be reordered.
   ///
@@ -126,6 +131,7 @@ class AnimatedSliverChildBuilderDelegate extends AnimatedSliverChildDelegate {
     this.morphDuration = const Duration(milliseconds: 500),
     this.morphComparator,
     this.reorderModel,
+    this.initialScrollOffsetCallback,
   })  : assert(initialChildCount >= 0),
         initialChildCount = initialChildCount;
 
@@ -273,30 +279,27 @@ class AnimatedListAnimationData {
 }
 
 /// Use this controller to notify to the [AnimatedListView] about changes in your underlying list and more.
-class AnimatedListController implements _ControllerListeners {
-  Set<_ControllerListeners>? _listeners = <_ControllerListeners>{};
+class AnimatedListController {
+  _ControllerInterface? _interface;
 
   /// Notifies the [AnimatedListView] that a range starting from [from] and [count] long
   /// has been modified. Call this method after actually you have updated your list.
   /// A new builder [changeItemBuilder] has to be provided in order to build the old
   /// items when animating.
   /// A [priority] can be also specified if you need to prioritize this notification.
-  @override
   void notifyChangedRange(
       int from, int count, AnimatedWidgetBuilder changeItemBuilder,
       [int priority = 0]) {
-    assert(_debugAssertNotDisposed());
-    _listeners!.forEach(
-        (l) => l.notifyChangedRange(from, count, changeItemBuilder, priority));
+    assert(_debugAssertBinded());
+    _interface!.notifyChangedRange(from, count, changeItemBuilder, priority);
   }
 
   /// Notifies the [AnimatedListView] that a new range starting from [from] and [count] long
   /// has been inserted. Call this method after actually you have updated your list.
   /// A [priority] can be also specified if you need to prioritize this notification.
-  @override
   void notifyInsertedRange(int from, int count, [int priority = 0]) {
-    assert(_debugAssertNotDisposed());
-    _listeners!.forEach((l) => l.notifyInsertedRange(from, count, priority));
+    assert(_debugAssertBinded());
+    _interface!.notifyInsertedRange(from, count, priority);
   }
 
   /// Notifies the [AnimatedListView] that a range starting from [from] and [count] long
@@ -304,13 +307,11 @@ class AnimatedListController implements _ControllerListeners {
   /// A new builder [removeItemBuilder] has to be provided in order to build the removed
   /// items when animating.
   /// A [priority] can be also specified if you need to prioritize this notification.
-  @override
   void notifyRemovedRange(
       int from, int count, AnimatedWidgetBuilder removeItemBuilder,
       [int priority = 0]) {
-    assert(_debugAssertNotDisposed());
-    _listeners!.forEach(
-        (l) => l.notifyRemovedRange(from, count, removeItemBuilder, priority));
+    assert(_debugAssertBinded());
+    _interface!.notifyRemovedRange(from, count, removeItemBuilder, priority);
   }
 
   /// Notifies the [AnimatedListView] that a range starting from [from] and [removeCount] long
@@ -319,85 +320,106 @@ class AnimatedListController implements _ControllerListeners {
   /// A new builder [removeItemBuilder] has to be provided in order to build the replaced
   /// items when animating.
   /// A [priority] can be also specified if you need to prioritize this notification.
-  @override
   void notifyReplacedRange(int from, int removeCount, int insertCount,
       AnimatedWidgetBuilder removeItemBuilder,
       [int priority = 0]) {
-    assert(_debugAssertNotDisposed());
-    _listeners!.forEach((l) => l.notifyReplacedRange(
-        from, removeCount, insertCount, removeItemBuilder, priority));
+    assert(_debugAssertBinded());
+    _interface!.notifyReplacedRange(
+        from, removeCount, insertCount, removeItemBuilder, priority);
   }
 
   /// If more changes to the underlying list need be applied in a row, it is more efficient
   /// to call this method and notify all the changes within the callback.
-  @override
   void batch(VoidCallback callback) {
-    assert(_debugAssertNotDisposed());
-    _listeners!.forEach((l) => l.batch(callback));
+    assert(_debugAssertBinded());
+    _interface!.batch(callback);
   }
 
   /// Notifies the [AnimatedListView] that a new reoder has begun.
   /// The [context] has to be provided to help [AnimatedListView] to locate the item
   /// to be picked up for reordering.
   /// The attributs [dx] and [dy] are the coordinates relative to the position of the item.
-  /// Use this method only if you have decided not to use the 
-  /// [AnimatedSliverChildBuilderDelegate.addLongPressReorderable] attribute or the 
+  /// Use this method only if you have decided not to use the
+  /// [AnimatedSliverChildBuilderDelegate.addLongPressReorderable] attribute or the
   /// [LongPressReorderable] widget (for example if you want to reorder using your
   /// custom drag handles).
-  @override
   void notifyStartReorder(BuildContext context, double dx, double dy) {
-    assert(_debugAssertNotDisposed());
-    _listeners!.forEach((l) => l.notifyStartReorder(context, dx, dy));
+    assert(_debugAssertBinded());
+    _interface!.notifyStartReorder(context, dx, dy);
   }
 
   /// Notifies the [AnimatedListView] that the dragged item has moved.
   /// The attributs [dx] and [dy] are the coordinates relative to the original position of the item.
-  /// Use this method only if you have decided not to use the 
-  /// [AnimatedSliverChildBuilderDelegate.addLongPressReorderable] attribute or the 
+  /// Use this method only if you have decided not to use the
+  /// [AnimatedSliverChildBuilderDelegate.addLongPressReorderable] attribute or the
   /// [LongPressReorderable] widget (for example if you want to reorder using your
   /// custom drag handles).
-  @override
   void notifyUpdateReorder(double dx, double dy) {
-    assert(_debugAssertNotDisposed());
-    _listeners!.forEach((l) => l.notifyUpdateReorder(dx, dy));
+    assert(_debugAssertBinded());
+    _interface!.notifyUpdateReorder(dx, dy);
   }
 
   /// Notifies the [AnimatedListView] that the reorder has finished or cancelled.
-  /// Use this method only if you have decided not to use the 
-  /// [AnimatedSliverChildBuilderDelegate.addLongPressReorderable] attribute or the 
+  /// Use this method only if you have decided not to use the
+  /// [AnimatedSliverChildBuilderDelegate.addLongPressReorderable] attribute or the
   /// [LongPressReorderable] widget (for example if you want to reorder using your
   /// custom drag handles).
-  @override
   void notifyStopReorder(bool cancel) {
-    assert(_debugAssertNotDisposed());
-    _listeners!.forEach((l) => l.notifyStopReorder(cancel));
+    assert(_debugAssertBinded());
+    _interface!.notifyStopReorder(cancel);
   }
 
-  /// Disposes this controller. After disposal, this controller can no longer be used.
-  void dispose() {
-    assert(_debugAssertNotDisposed());
-    _listeners!.clear();
-    _listeners = null;
+  /// Computes the box (in pixels) of the item indicated by the index provided.
+  /// If [absolute] is `false` the offset is relative to the upper edge of the list view or sliver,
+  /// otherwise the offset is relative to the upper edge of the topmost sliver.
+  /// The index of the item refers to the actual item of the list view, therefore in case of animations in progress
+  /// it may not correspond to the index of the underlying list. If you want to specify the index of the latter,
+  /// first convert it by using the [AnimatedListController.listToActualItemIndex] method.
+  /// For one, you might pass the result to the [ScrollController.jumpTo] or [ScrollController.animateTo] methods 
+  /// of a [ScrollController] to scroll to the desired item.
+  Rect? computeItemBox(int index, [bool absolute = false]) {
+    assert(_debugAssertBinded());
+    return _interface!.computeItemBox(index, absolute);
   }
 
-  void _addListener(_ControllerListeners listener) {
-    assert(_debugAssertNotDisposed());
-    assert(!_listeners!.contains(listener));
-    _listeners!.add(listener);
+  /// Converts the index of an item in the underlying list into the actual index displayed in the list view. 
+  /// If the list view is not animating, the same index will be returned.
+  /// If the item is not yet visible, as the list view is animating, `null` will be returned.
+  int? listToActualItemIndex(int index) {
+    assert(_debugAssertBinded());
+    return _interface!.listToActualItemIndex(index);
   }
 
-  void _removeListener(_ControllerListeners listener) {
-    assert(_debugAssertNotDisposed());
-    assert(_listeners!.contains(listener));
-    _listeners!.remove(listener);
+  /// Converts the actual index displayed in the list view into the underlying list index. 
+  /// If the list view is not animating, the same index will be returned.
+  /// If the actual item dosen't match a list item (such as a resizing interval when the list view is being animated), 
+  /// `null` will be returned.
+  int? actualToListItemIndex(int index) {
+    assert(_debugAssertBinded());
+    return _interface!.actualToListItemIndex(index);
   }
 
-  bool _debugAssertNotDisposed() {
+  void _setInterface(_ControllerInterface interface) {
+    if (_interface != null) {
+      throw FlutterError(
+          'You are trying to bind this controller to multiple animated list views.\n'
+          'A $runtimeType can only be binded to one list view at a time.');
+    }
+    _interface = interface;
+  }
+
+  void _unsetInterface(_ControllerInterface interface) {
+    if (_interface == interface) {
+      _interface = null;
+    }
+  }
+
+  bool _debugAssertBinded() {
     assert(() {
-      if (_listeners == null) {
+      if (_interface == null) {
         throw FlutterError(
-          'A $runtimeType was used after being disposed.\n'
-          'Once you have called dispose() on a $runtimeType, it can no longer be used.',
+          'This controller was used before it was connected to an animated list view.\n'
+          'Make sure you passed this instance to the listController attribute of an AutomaticAnimatedListView, AnimatedListView, AnimatedSliverList or AnimatedSliverFixedExtentList.',
         );
       }
       return true;
@@ -406,20 +428,20 @@ class AnimatedListController implements _ControllerListeners {
   }
 }
 
-abstract class _ControllerListeners {
+abstract class _ControllerInterface {
   void notifyChangedRange(
       int from, int count, final AnimatedWidgetBuilder changeItemBuilder,
-      [int priority = 0]);
+      int priority);
 
-  void notifyInsertedRange(int from, int count, [int priority = 0]);
+  void notifyInsertedRange(int from, int count, int priority);
 
   void notifyRemovedRange(
       int from, int count, final AnimatedWidgetBuilder removeItemBuilder,
-      [int priority = 0]);
+      int priority);
 
   void notifyReplacedRange(int from, int removeCount, final int insertCount,
       final AnimatedWidgetBuilder removeItemBuilder,
-      [int priority = 0]);
+      int priority);
 
   void batch(VoidCallback callback);
 
@@ -428,6 +450,12 @@ abstract class _ControllerListeners {
   void notifyUpdateReorder(double dx, double dy) {}
 
   void notifyStopReorder(bool cancel) {}
+
+  Rect? computeItemBox(int index, bool absolute);
+
+  int? listToActualItemIndex(int index);
+
+  int? actualToListItemIndex(int index);
 }
 
 class _SaltedValueKey extends ValueKey<Key> {

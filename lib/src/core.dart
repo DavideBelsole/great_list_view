@@ -130,3 +130,5 @@ class _Measure {
   @override
   String toString() => estimated ? '≈$value' : '$value';
 }
+
+typedef InitialScrollOffsetCallback = double? Function(SliverConstraints constraints);

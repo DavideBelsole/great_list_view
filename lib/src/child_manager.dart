@@ -10,7 +10,7 @@ part of 'core.dart';
 class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
     implements
         RenderSliverBoxChildManager,
-        _ControllerListeners,
+        _ControllerInterface,
         _ListIntervalInterface {
   /// Creates an element that lazily builds children for the given widget with
   /// support for animations and reordering.
@@ -37,14 +37,14 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   void mount(final Element? parent, final dynamic newSlot) {
     super.mount(parent, newSlot);
     renderObject.didChangeDependencies(this);
-    widget.listController._addListener(this);
+    widget.listController._setInterface(this);
   }
 
   /// This method has been overridden to give the render object a `dispose` method and to unlink
   /// this list view from its controller.
   @override
   void unmount() {
-    widget.listController._removeListener(this);
+    widget.listController._unsetInterface(this);
     renderObject.dispose();
     super.unmount();
   }
@@ -60,8 +60,8 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
     final oldWidget = widget;
     super.update(newWidget);
     if (newWidget.listController != oldWidget.listController) {
-      oldWidget.listController._removeListener(this);
-      newWidget.listController._addListener(this);
+      oldWidget.listController._unsetInterface(this);
+      newWidget.listController._setInterface(this);
     }
     if (intervalList.hasPendingUpdates) {
       performRebuild();
@@ -196,10 +196,10 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
     }
   }
 
-  Widget? _build(int index) {
+  Widget? _build(int index, [bool measureOnly = false]) {
     final count = intervalList.buildItemCount;
     if (index < 0 || index >= count) return null;
-    return intervalList.build(this, index);
+    return intervalList.build(this, index, measureOnly);
   }
 
   // It creates an disposable off-list child, building the specified widget,
@@ -512,8 +512,8 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
 
       // replace the in-list dragged item with a new resizing interval widget
       _currentlyUpdatingChildIndex = buildIndex;
-      final newElement =
-          updateChild(null, openInterval.buildWidget(this, 0, 0), buildIndex);
+      final newElement = updateChild(
+          null, openInterval.buildWidget(this, 0, 0, false), buildIndex);
       _childElements[buildIndex] = newElement;
       _currentlyUpdatingChildIndex = null;
 
@@ -675,41 +675,37 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
 
   /// See [AnimatedListController.notifyInsertedRange].
   @override
-  void notifyInsertedRange(int from, int count, [int priority = 0]) =>
+  void notifyInsertedRange(int from, int count, int priority) =>
       _notifyReplacedRange(from, 0, count, null, priority);
 
   /// See [AnimatedListController.notifyRemovedRange].
   @override
-  void notifyRemovedRange(
-          int from, int count, final AnimatedWidgetBuilder removedItemBuilder,
-          [int priority = 0]) =>
+  void notifyRemovedRange(int from, int count,
+          final AnimatedWidgetBuilder removedItemBuilder, int priority) =>
       _notifyReplacedRange(from, count, 0, removedItemBuilder, priority);
 
   /// See [AnimatedListController.notifyReplacedRange].
   @override
   void notifyReplacedRange(int from, int removeCount, final int insertCount,
-          final AnimatedWidgetBuilder removedItemBuilder, [int priority = 0]) =>
+          final AnimatedWidgetBuilder removedItemBuilder, int priority) =>
       _notifyReplacedRange(
           from, removeCount, insertCount, removedItemBuilder, priority);
 
   /// See [AnimatedListController.notifyChangedRange].
   @override
-  void notifyChangedRange(
-          int from, int count, final AnimatedWidgetBuilder changedItemBuilder,
-          [int priority = 0]) =>
+  void notifyChangedRange(int from, int count,
+          final AnimatedWidgetBuilder changedItemBuilder, int priority) =>
       _notifyChangedRange(from, count, changedItemBuilder, priority);
 
   void _notifyReplacedRange(int from, int removeCount, final int insertCount,
-      final AnimatedWidgetBuilder? removedItemBuilder,
-      [int priority = 0]) {
+      final AnimatedWidgetBuilder? removedItemBuilder, int priority) {
     intervalList.notifyRangeReplaced(
         from, removeCount, insertCount, removedItemBuilder, priority);
     if (_batch == 0) intervalList.coordinate();
   }
 
-  void _notifyChangedRange(
-      int from, int count, final AnimatedWidgetBuilder changedItemBuilder,
-      [int priority = 0]) {
+  void _notifyChangedRange(int from, int count,
+      final AnimatedWidgetBuilder changedItemBuilder, int priority) {
     intervalList.notifyRangeChanged(from, count, changedItemBuilder, priority);
     if (_batch == 0) intervalList.coordinate();
   }
@@ -730,6 +726,37 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   @override
   void notifyStopReorder(bool cancel) {
     renderObject._reorderStop(cancel);
+  }
+
+  @override
+  Rect? computeItemBox(int index, bool absolute) {
+    return renderObject._computeItemBox(index, absolute);
+  }
+
+  @override
+  int? listToActualItemIndex(int index) {
+    if (index < 0 || index >= intervalList.listItemCount) {
+      return null;
+    }
+    final interval = intervalList.intervalAtListIndex(index);
+    if (interval.interval is _InListItemInterval ||
+        interval.interval is _ReadyToChangingInterval) {
+      return interval.buildIndex + (index - interval.itemIndex);
+    }
+    return null;
+  }
+
+  @override
+  int? actualToListItemIndex(int index) {
+    if (index < 0 || index >= intervalList.buildItemCount) {
+      return null;
+    }
+    final interval = intervalList.intervalAtBuildIndex(index);
+    if (interval.interval is _InListItemInterval ||
+        interval.interval is _ReadyToChangingInterval) {
+      return interval.itemIndex + (index - interval.buildIndex);
+    }
+    return null;
   }
 }
 

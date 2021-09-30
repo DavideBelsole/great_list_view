@@ -34,6 +34,7 @@ class AnimatedListView extends BoxScrollView {
     bool morphResizeWidgets = true,
     Duration morphDuration = const Duration(milliseconds: 500),
     AnimatedListBaseReorderModel? reorderModel,
+    InitialScrollOffsetCallback? initialScrollOffsetCallback,
     //
     Axis scrollDirection = Axis.vertical,
     bool reverse = false,
@@ -68,6 +69,7 @@ class AnimatedListView extends BoxScrollView {
           morphDuration: morphDuration,
           morphComparator: morphComparator,
           reorderModel: reorderModel,
+          initialScrollOffsetCallback: initialScrollOffsetCallback,
         ),
         super(
           key: key,
@@ -158,7 +160,7 @@ abstract class AnimatedSliverMultiBoxAdaptorWidget
 
   final AnimatedSliverChildDelegate delegate;
 
-  static _ControllerListeners? of(BuildContext context) {
+  static _ControllerInterface? of(BuildContext context) {
     try {
       return context
           .findAncestorRenderObjectOfType<AnimatedRenderSliverList>()
@@ -233,6 +235,7 @@ class AutomaticAnimatedListView<T> extends AnimatedListView {
     Duration morphDuration = const Duration(milliseconds: 500),
     MorphComparator? morphComparator,
     AnimatedListBaseReorderModel? reorderModel,
+    InitialScrollOffsetCallback? initialScrollOffsetCallback,
     //
     Axis scrollDirection = Axis.vertical,
     bool reverse = false,
@@ -285,6 +288,7 @@ class AutomaticAnimatedListView<T> extends AnimatedListView {
             morphDuration: morphDuration,
             morphComparator: morphComparator,
             reorderModel: reorderModel,
+            initialScrollOffsetCallback: initialScrollOffsetCallback,
           ),
         );
 

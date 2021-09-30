@@ -73,8 +73,8 @@ abstract class _Interval extends LinkedListEntry<_Interval> {
     return null;
   }
 
-  Widget buildWidget(
-          BuildContext context, int buildIndexOffset, int listIndexOffset) =>
+  Widget buildWidget(BuildContext context, int buildIndexOffset,
+          int listIndexOffset, bool measureOnly) =>
       throw UnimplementedError('This interval is not meant to be built');
 
   void dispose() {
@@ -139,11 +139,15 @@ abstract class _InListItemInterval extends _AnimatedInterval {
   int get itemCount => length;
 
   @override
-  Widget buildWidget(
-      BuildContext context, int buildIndexOffset, int listIndexOffset) {
+  Widget buildWidget(BuildContext context, int buildIndexOffset,
+      int listIndexOffset, bool measureOnly) {
     assert(_debugAssertNotDisposed());
-    return intervalList.inListBuilder.call(context, buildIndexOffset,
-        listIndexOffset, AnimatedWidgetBuilderData(_animation.animation));
+    return intervalList.inListBuilder.call(
+        context,
+        buildIndexOffset,
+        listIndexOffset,
+        AnimatedWidgetBuilderData(_animation.animation,
+            measuring: measureOnly));
   }
 }
 
@@ -166,11 +170,15 @@ abstract class _OffListItemInterval extends _AnimatedInterval {
   int get itemCount => inLength;
 
   @override
-  Widget buildWidget(
-      BuildContext context, int buildIndexOffset, int listIndexOffset) {
+  Widget buildWidget(BuildContext context, int buildIndexOffset,
+      int listIndexOffset, bool measureOnly) {
     assert(_debugAssertNotDisposed());
-    return builder.call(context, buildIndexOffset, listIndexOffset,
-        AnimatedWidgetBuilderData(_animation.animation));
+    return builder.call(
+        context,
+        buildIndexOffset,
+        listIndexOffset,
+        AnimatedWidgetBuilderData(_animation.animation,
+            measuring: measureOnly));
   }
 }
 
@@ -465,12 +473,18 @@ class _ResizingInterval extends _AnimatedInterval
   int get itemCount => toLength;
 
   @override
-  Widget buildWidget(
-      BuildContext context, int buildIndexOffset, int listIndexOffset) {
+  Widget buildWidget(BuildContext context, int buildIndexOffset,
+      int listIndexOffset, bool measureOnly) {
     assert(_debugAssertNotDisposed());
-    final animation = Tween<double>(begin: fromSize.value, end: toSize.value)
-        .animate(_animation.animation);
+    final tween = Tween<double>(begin: fromSize.value, end: toSize.value);
     final horizontal = intervalList.interface.isHorizontal;
+    if (measureOnly) {
+      return SizedBox(
+        width: horizontal ? tween.evaluate(_animation.animation) : null,
+        height: !horizontal ? tween.evaluate(_animation.animation) : null,
+      );
+    }
+    final animation = tween.animate(_animation.animation);
     return AnimatedBuilder(
         animation: animation,
         builder: (context, child) => SizedBox(
@@ -532,8 +546,8 @@ class _ReadyToInsertionInterval extends _Interval
   }
 
   @override
-  Widget buildWidget(
-      BuildContext context, int buildIndexOffset, int listIndexOffset) {
+  Widget buildWidget(BuildContext context, int buildIndexOffset,
+      int listIndexOffset, bool measureOnly) {
     assert(_debugAssertNotDisposed());
     final horizontal = intervalList.interface.isHorizontal;
     return SizedBox(
@@ -652,8 +666,8 @@ class _ReadyToNewResizingInterval extends _Interval
   int get fromLength => oldAverageItemSizeCount.count;
 
   @override
-  Widget buildWidget(
-      BuildContext context, int buildIndexOffset, int listIndexOffset) {
+  Widget buildWidget(BuildContext context, int buildIndexOffset,
+      int listIndexOffset, bool measureOnly) {
     assert(_debugAssertNotDisposed());
     final horizontal = intervalList.interface.isHorizontal;
     return SizedBox(
@@ -685,7 +699,7 @@ class _ReadyToResizingSpawnedInterval extends _HolderInterval
   _ReadyToResizingSpawnedInterval? from(
       covariant _ReadyToResizingSpawnedInterval interval, int itemCount) {
     assert(_debugAssertNotDisposed());
-    if ( itemCount == 0 ) return null;
+    if (itemCount == 0) return null;
     return _ReadyToResizingSpawnedInterval(itemCount, priority);
   }
 
@@ -736,6 +750,22 @@ class _ReadyToChangingInterval extends _OffListItemInterval
   }
 
   @override
+  _Interval? mergeWith(_Interval leftInterval) {
+    assert(_debugAssertNotDisposed());
+    if (leftInterval is _ReadyToChangingInterval &&
+        leftInterval._animation is _CompletedAnimation &&
+        _animation is _CompletedAnimation &&
+        leftInterval.priority == priority) {
+      return _ReadyToChangingInterval(
+          _animation,
+          _joinBuilders(leftInterval.builder, builder, leftInterval.offLength),
+          leftInterval.inLength + inLength,
+          priority);
+    }
+    return null;
+  }
+
+  @override
   String toString() => '->Ch (${super.toString()})';
 
   @override
@@ -776,11 +806,17 @@ abstract class _ReorderResizingInterval extends _AnimatedInterval
       _AverageItemSizeCount(itemSize, 1);
 
   @override
-  Widget buildWidget(
-      BuildContext context, int buildIndexOffset, int listIndexOffset) {
-    final animation = Tween<double>(begin: fromSize, end: toSize)
-        .animate(_animation.animation);
+  Widget buildWidget(BuildContext context, int buildIndexOffset,
+      int listIndexOffset, bool measureOnly) {
+    final tween = Tween<double>(begin: fromSize, end: toSize);
     final horizontal = intervalList.interface.isHorizontal;
+    if (measureOnly) {
+      return SizedBox(
+        width: horizontal ? tween.evaluate(_animation.animation) : null,
+        height: !horizontal ? tween.evaluate(_animation.animation) : null,
+      );
+    }
+    final animation = tween.animate(_animation.animation);
     return AnimatedBuilder(
         animation: animation,
         builder: (context, child) => SizedBox(
@@ -941,10 +977,25 @@ class _IntervalList extends LinkedList<_Interval> with TickerProviderMixin {
     throw Exception('this point should never have been reached');
   }
 
-  Widget build(BuildContext context, int buildIndex) {
+  _IntervalInfo intervalAtListIndex(int listIndex) {
+    assert(_debugAssertNotDisposed());
+    var buildOffset = 0, itemOffset = 0;
+    _Interval? interval, nextInterval;
+    for (interval = first; interval != null; interval = nextInterval) {
+      nextInterval = interval.next;
+      if (listIndex < interval.itemCount + itemOffset) {
+        return _IntervalInfo(interval, buildOffset, itemOffset);
+      }
+      buildOffset += interval.buildCount;
+      itemOffset += interval.itemCount;
+    }
+    throw Exception('this point should never have been reached');
+  }
+
+  Widget build(BuildContext context, int buildIndex, bool measureOnly) {
     final info = intervalAtBuildIndex(buildIndex);
-    return info.interval
-        .buildWidget(context, buildIndex - info.buildIndex, info.itemIndex);
+    return info.interval.buildWidget(
+        context, buildIndex - info.buildIndex, info.itemIndex, measureOnly);
   }
 
   // Returns true if there are pending updates.
@@ -1052,8 +1103,8 @@ class _IntervalList extends LinkedList<_Interval> with TickerProviderMixin {
   _IntervalBuilder offListBuilder(final AnimatedWidgetBuilder builder,
       [final int offset = 0]) {
     assert(offset >= 0);
-    return (context, buildIndexOffset, listIndexOffset, data) =>
-        interface.buildWidget(context, builder, buildIndexOffset + offset, data);
+    return (context, buildIndexOffset, listIndexOffset, data) => interface
+        .buildWidget(context, builder, buildIndexOffset + offset, data);
   }
 
   void onReplaceNotification(
@@ -1080,10 +1131,9 @@ class _IntervalList extends LinkedList<_Interval> with TickerProviderMixin {
       final length = interval.itemCount - removeCount + insertCount;
       if (length != interval.itemCount) {
         final newInterval = interval.from(interval, length);
-        if ( newInterval != null ) {
+        if (newInterval != null) {
           replace(interval, newInterval);
-        }
-        else {
+        } else {
           interval.dispose();
         }
       }
@@ -1411,7 +1461,7 @@ class _IntervalList extends LinkedList<_Interval> with TickerProviderMixin {
 
   // It recreates all interval that are closing to keep stable the offset layouts
   // stable of the items not affected by reordering.
-  // Also, eventually transforms the open (or opening) interval in  a new
+  // Also, eventually transforms the open (or opening) interval in a new
   // closing interval.
   void reorderUpdateClosingIntervals() {
     whereType<_ReorderClosingInterval>().toList().forEach((interval) {
