@@ -1,3 +1,4 @@
+library great_list_view;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -20,8 +21,9 @@ mixin TickerProviderMixin implements TickerProvider {
     _tickers!.remove(ticker);
   }
 
-  bool get hasActiveTickers => _tickers != null && _tickers!.any((t) => t.isActive);
-  
+  bool get hasActiveTickers =>
+      _tickers != null && _tickers!.any((t) => t.isActive);
+
   void dispose() {
     assert(() {
       if (_tickers != null) {
@@ -59,7 +61,8 @@ mixin TickerProviderMixin implements TickerProvider {
 }
 
 class _WidgetTicker extends Ticker {
-  _WidgetTicker(TickerCallback onTick, this._creator, { String? debugLabel }) : super(onTick, debugLabel: debugLabel);
+  _WidgetTicker(TickerCallback onTick, this._creator, {String? debugLabel})
+      : super(onTick, debugLabel: debugLabel);
 
   final TickerProviderMixin _creator;
 

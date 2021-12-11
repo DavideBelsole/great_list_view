@@ -4,25 +4,21 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:math' as math;
 
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
-import 'package:flutter/widgets.dart';
 
-import 'package:worker_manager/worker_manager.dart';
-import 'package:diffutil_dart/diffutil.dart';
+import '../delegates.dart';
+import '../ticker_mixin.dart';
+import '../widgets.dart';
 
-import 'ticker_mixin.dart';
-import 'other_widgets.dart';
-
-part 'intervals.dart';
+part 'animation.dart';
 part 'child_manager.dart';
+part 'controller.dart';
+part 'interval_list.dart';
+part 'intervals.dart';
 part 'sliver_list.dart';
-part 'delegates.dart';
-part 'widgets.dart';
-part 'dispatcher.dart';
 
 /// Additional information to build a specific item of the list.
 class AnimatedWidgetBuilderData {
@@ -120,7 +116,7 @@ class _Measure {
   final double value;
   final bool estimated;
 
-  static const _Measure zero = _Measure(0, false);
+  static _Measure get zero => const _Measure(0, false);
 
   const _Measure(this.value, [this.estimated = false]);
 
@@ -131,4 +127,93 @@ class _Measure {
   String toString() => estimated ? '≈$value' : '$value';
 }
 
-typedef InitialScrollOffsetCallback = double? Function(SliverConstraints constraints);
+extension _MeasureExtension on double {
+  _Measure toExactMeasure() => this == 0.0 ? _Measure.zero : _Measure(this);
+}
+
+typedef InitialScrollOffsetCallback = double? Function(
+    SliverConstraints constraints);
+
+class PercentageSize {
+  final double size, referredSize;
+
+  PercentageSize(this.size, this.referredSize);
+
+  double get percentage => size / referredSize;
+
+  @override
+  String toString() => '${percentage * 100.0}%';
+}
+
+typedef _UpdateFlags = int;
+
+extension _UpdateFlagsEx on _UpdateFlags {
+  // static const int UNBIND_NONE = 0;
+  static const int CLEAR_LAYOUT_OFFSET = 1 << 0;
+  static const int KEEP_FIRST_LAYOUT_OFFSET = 1 << 1;
+  static const int REORDER_PICK = 1 << 2;
+  static const int REORDER_DROP = 1 << 3;
+  static const int DISCARD_ELEMENT = 1 << 4;
+
+  bool get hasClearLayoutOffset =>
+      (this & CLEAR_LAYOUT_OFFSET) == CLEAR_LAYOUT_OFFSET;
+  bool get hasKeepFirstLayoutOffset =>
+      (this & KEEP_FIRST_LAYOUT_OFFSET) == KEEP_FIRST_LAYOUT_OFFSET;
+  bool get hasReorderPick => (this & REORDER_PICK) == REORDER_PICK;
+  bool get hasReorderDrop => (this & REORDER_DROP) == REORDER_DROP;
+  bool get hasDiscardElement => (this & DISCARD_ELEMENT) == DISCARD_ELEMENT;
+
+  bool checkIntegrity() {
+    assert((this &
+            ~(CLEAR_LAYOUT_OFFSET |
+                KEEP_FIRST_LAYOUT_OFFSET |
+                REORDER_PICK |
+                REORDER_DROP |
+                DISCARD_ELEMENT)) ==
+        0);
+    assert((this & (CLEAR_LAYOUT_OFFSET | KEEP_FIRST_LAYOUT_OFFSET)) !=
+        KEEP_FIRST_LAYOUT_OFFSET);
+    assert((this & (REORDER_PICK | REORDER_DROP)) !=
+        (REORDER_PICK | REORDER_DROP));
+    return true;
+  }
+}
+
+class _Update {
+  const _Update(this.index, this.oldBuildCount, this.newBuildCount,
+      [this.flags = 0, this.popUpList])
+      : assert(index >= 0 && oldBuildCount >= 0 && newBuildCount >= 0);
+
+  final int index;
+  final int oldBuildCount, newBuildCount;
+  final _UpdateFlags flags;
+  final _PopUpList? popUpList;
+
+  int get skipCount => newBuildCount - oldBuildCount;
+
+  @override
+  String toString() =>
+      'U(i: $index, ob: $oldBuildCount, nb: $newBuildCount, s: $skipCount, m: $flags)';
+}
+
+typedef _IntervalBuilder = Widget Function(BuildContext context, int buildIndex,
+    int listIndex, AnimatedWidgetBuilderData data);
+
+// Creates a copy of an interval builder possibly adding more offset.
+// If the offset is zero, the same interval builder is returned.
+_IntervalBuilder _offsetIntervalBuilder(
+    final _IntervalBuilder iBuilder, final int offset) {
+  assert(offset >= 0);
+  if (offset == 0) return iBuilder;
+  return (context, buildIndex, itemIndex, data) =>
+      iBuilder.call(context, buildIndex + offset, itemIndex, data);
+}
+
+// Joins two interval builder and returns a new merged one.
+_IntervalBuilder _joinBuilders(final _IntervalBuilder leftBuilder,
+    final _IntervalBuilder rightBuilder, final int leftCount) {
+  assert(leftCount > 0);
+  return (context, buildIndex, listIndex, data) => (buildIndex < leftCount)
+      ? leftBuilder.call(context, buildIndex, listIndex, data)
+      : rightBuilder.call(context, buildIndex - leftCount, listIndex, data);
+}

@@ -26,3 +26,12 @@ Initial alpha release. Includes `AnimatedSliverList`, `AnimatedListDiffDispatche
 - Added `computeItemBox`, `listToActualItemIndex` and `actualToListItemIndex` methods to the list controller;
 - Added `initialScrollOffsetCallback` attribute;
 - Other small changes.
+
+## [0.1.2] - 11-12-2021
+
+- More bug fixes;
+- Finally this library also works for web development;
+- Removed listToActualItemIndex and actualToListItemIndex methods, no more needed;
+- Removed explicit version dependencies;
+- Code changed to work with the new stable version of flutter 2.5.3;
+- Added holdScrollOffset attribute to prevent scrolling up when the above items not visibile are modified;.

@@ -36,7 +36,7 @@ Add this to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  great_list_view: ^0.1.1
+  great_list_view: ^0.1.2
 ```
 
 and run;
@@ -132,6 +132,7 @@ class _BodyState extends State<Body> {
   @override
   Widget build(BuildContext context) {
     return Scrollbar(
+      controller: scrollController,
       child: AutomaticAnimatedListView<ItemData>(
         list: currentList,
         comparator: AnimatedListDiffListComparator<ItemData>(
@@ -143,6 +144,7 @@ class _BodyState extends State<Body> {
                 margin: EdgeInsets.all(5), height: item.fixedHeight ?? 60)
             : Item(data: item),
         listController: controller,
+        scrollController: scrollController,
       ),
     );
   }
@@ -196,15 +198,16 @@ List<ItemData> listB = [
   ItemData(8, Colors.yellowAccent)
 ];
 
+final scrollController = ScrollController();
 final controller = AnimatedListController();
 final gkey = GlobalKey<_BodyState>();
 ```
 
 However, if the changing content cannot be implicitly animated using implicit animations, such as animating a text that is changing, I suggest using `MorphTransition`, which provides a cross-fade effect between the old widget and the new one.
-The `MorphTransition` widget uses a delegate to pass to the` comparator` attribute which takes care of comparing the old widget with the new one. This delegate has to return false if the two widgets are different, in order to trigger the cross-fade effect. 
+The `MorphTransition` widget uses a delegate to pass to the `comparator` attribute which takes care of comparing the old widget with the new one. This delegate has to return false if the two widgets are different, in order to trigger the cross-fade effect. 
 This comparator needs to be well implemented, because returning false even when not necessary will lead to a drop in performance as this effect would also be applied to two completely identical widgets, thus wasting precious resources to perform an animation that is not actually necessary and that is not even perceptible to the human eye.
 
-More simply, if you pass the delegate directly to the `morphComparator` attribute of the` AutomaticAnimatedListView` widget, all items will automatically be wrapped with a `MorphTransition` widget.
+More simply, if you pass the delegate directly to the `morphComparator` attribute of the `AutomaticAnimatedListView` widget, all items will automatically be wrapped with a `MorphTransition` widget.
 
 For more features please read the documentation of the `AutomaticAnimatedListView` class.
 
@@ -214,6 +217,19 @@ For more features please read the documentation of the `AutomaticAnimatedListVie
 import 'package:flutter/material.dart';
 import 'package:great_list_view/great_list_view.dart';
 import 'package:worker_manager/worker_manager.dart';
+
+void main() {
+  Executor().warmUp();
+  runApp(App());
+}
+
+import 'package:flutter/material.dart';
+import 'package:great_list_view/great_list_view.dart';
+import 'package:worker_manager/worker_manager.dart';
+
+void runExample7() {
+  runApp(App());
+}
 
 void main() {
   Executor().warmUp();
@@ -266,28 +282,30 @@ class _BodyState extends State<Body> {
   @override
   Widget build(BuildContext context) {
     return Scrollbar(
+      controller: scrollController,
       child: AutomaticAnimatedListView<ItemData>(
-          list: currentList,
-          comparator: AnimatedListDiffListComparator<ItemData>(
-              sameItem: (a, b) => a.id == b.id,
-              sameContent: (a, b) =>
-                  a.text == b.text &&
-                  a.color == b.color &&
-                  a.fixedHeight == b.fixedHeight),
-          itemBuilder: (context, item, data) => data.measuring
-              ? Container(
-                  margin: EdgeInsets.all(5), height: item.fixedHeight ?? 60)
-              : Item(data: item),
-          listController: controller,
-          morphComparator: (a, b) {
-            if (a is Item && b is Item) {
-              return a.data.text == b.data.text &&
-                  a.data.color == b.data.color &&
-                  a.data.fixedHeight == b.data.fixedHeight;
-            }
-            return false;
+        list: currentList,
+        comparator: AnimatedListDiffListComparator<ItemData>(
+            sameItem: (a, b) => a.id == b.id,
+            sameContent: (a, b) =>
+                a.text == b.text &&
+                a.color == b.color &&
+                a.fixedHeight == b.fixedHeight),
+        itemBuilder: (context, item, data) => data.measuring
+            ? Container(
+                margin: EdgeInsets.all(5), height: item.fixedHeight ?? 60)
+            : Item(data: item),
+        listController: controller,
+        morphComparator: (a, b) {
+          if (a is Item && b is Item) {
+            return a.data.text == b.data.text &&
+                a.data.color == b.data.color &&
+                a.data.fixedHeight == b.data.fixedHeight;
           }
-        ),
+          return false;
+        },
+        scrollController: scrollController,
+      ),
     );
   }
 }
@@ -301,9 +319,8 @@ class Item extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
         onTap: () => gkey.currentState?.swapList(),
-        child: AnimatedContainer(
+        child: Container(
             height: data.fixedHeight ?? 60,
-            duration: const Duration(milliseconds: 500),
             margin: EdgeInsets.all(5),
             padding: EdgeInsets.all(15),
             decoration: BoxDecoration(
@@ -342,6 +359,7 @@ List<ItemData> listB = [
   ItemData('Other text 8', 8, Colors.yellowAccent)
 ];
 
+final scrollController = ScrollController();
 final controller = AnimatedListController();
 final gkey = GlobalKey<_BodyState>();
 ```
@@ -350,7 +368,7 @@ final gkey = GlobalKey<_BodyState>();
 
 If you want to have more control over the list view, or if the yuor data is not just items of a `List` object, I suggest using the more flexible `AnimatedListView` widget.
 
-Unlike the `AutomaticAnimatedListView` widget, the` AnimatedListView` does not use the Meyes algorithm internally, so all change notifications have to be manually notified to the list view.
+Unlike the `AutomaticAnimatedListView` widget, the `AnimatedListView` does not use the Meyes algorithm internally, so all change notifications have to be manually notified to the list view.
 
 As with the `AutomaticAnimatedListView` widget, you need to pass an `AnimatedListController` object to the `listController` attribute.
 
@@ -393,8 +411,7 @@ class _AppState extends State<App> {
         home: SafeArea(
             child: Scaffold(
           floatingActionButton: FloatingActionButton.extended(
-              label: Text('Random Change'),
-              onPressed: randomChange),
+              label: Text('Random Change'), onPressed: randomChange),
           body: Body(),
         )));
   }
@@ -406,12 +423,14 @@ class Body extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scrollbar(
+      controller: scrollController,
       child: AnimatedListView(
         initialItemCount: list.length,
         itemBuilder: (context, index, data) => data.measuring
-              ? Container(margin: EdgeInsets.all(5), height: 60)
-              : Item(data: list[index]),
+            ? Container(margin: EdgeInsets.all(5), height: 60)
+            : Item(data: list[index]),
         listController: controller,
+        scrollController: scrollController,
       ),
     );
   }
@@ -456,8 +475,6 @@ class ItemData {
 int id = 0;
 List<ItemData> list = [for (var i = 1; i <= 10; i++) ItemData(++id)];
 
-final controller = AnimatedListController();
-
 var r = Random();
 
 void randomChange() {
@@ -472,7 +489,7 @@ void randomChange() {
           (context, index, data) => Item(data: subList[index]));
       break;
     case 1: // insert
-      final from = list.isEmpty ? 0 : r.nextInt(list.length);
+      final from = r.nextInt(list.length + 1);
       final count = 1 + r.nextInt(5);
       list.insertAll(from, [for (var i = 0; i < count; i++) ItemData(++id)]);
       controller.notifyInsertedRange(from, count);
@@ -490,17 +507,19 @@ void randomChange() {
     case 3: // change
       final from = r.nextInt(list.length);
       final to = from + 1 + r.nextInt(list.length - from);
-      final count = to - from;
       final subList = list.sublist(from, to);
       list.replaceRange(from, to, [
-        for (var i = 0; i < count; i++)
+        for (var i = 0; i < to - from; i++)
           ItemData(subList[i].id, subList[i].color + 1)
       ]);
-      controller.notifyChangedRange(
-          from, count, (context, index, data) => Item(data: subList[index]));
+      controller.notifyChangedRange(from, to - from,
+          (context, index, data) => Item(data: subList[index]));
       break;
   }
 }
+
+final scrollController = ScrollController();
+final controller = AnimatedListController();
 ```
 
 It is always possible to manually integrate the Meyes algorithm using an `AnimatedListDiffListDispatcher` or a more generic `AnimatedListDiffDispatcher` (if your data is not items of a `List` object).
@@ -574,11 +593,13 @@ class _BodyState extends State<Body> {
   @override
   Widget build(BuildContext context) {
     return Scrollbar(
+      controller: scrollController,
       child: AnimatedListView(
         initialItemCount: dispatcher.currentList.length,
         itemBuilder: (context, index, data) =>
             itemBuilder(context, dispatcher.currentList[index], data),
         listController: controller,
+        scrollController: scrollController,
       ),
     );
   }
@@ -640,6 +661,7 @@ List<ItemData> listB = [
   ItemData(8, Colors.yellowAccent)
 ];
 
+final scrollController = ScrollController();
 final controller = AnimatedListController();
 final gkey = GlobalKey<_BodyState>();
 ```
@@ -721,7 +743,9 @@ class _BodyState extends State<Body> {
   @override
   Widget build(BuildContext context) {
     return Scrollbar(
+      controller: scrollController,
       child: CustomScrollView(
+        controller: scrollController,
         slivers: [
           SliverList(
               delegate: SliverChildBuilderDelegate(
@@ -748,7 +772,7 @@ class _BodyState extends State<Body> {
 }
 
 class Item extends StatelessWidget {
-x  final ItemData data;
+  final ItemData data;
 
   const Item({Key? key, required this.data}) : super(key: key);
 
@@ -803,6 +827,7 @@ List<ItemData> listB = [
   ItemData(8, Colors.yellowAccent)
 ];
 
+final scrollController = ScrollController();
 final controller = AnimatedListController();
 final gkey = GlobalKey<_BodyState>();
 ```
@@ -810,9 +835,9 @@ final gkey = GlobalKey<_BodyState>();
 ## Reordering
 
 The list view can also be reordered on demand, even while it is animating.
-You can enable the automatic reordering feature, which is activated by long pressing on the item you want to reorder, setting the `addLongPressReorderable` attribute to true (this attribute is in the` AutomaticAnimatedListView`, `AnimatedListView` and` AnimatedSliverChildBuilderDelegate` classes).
+You can enable the automatic reordering feature, which is activated by long pressing on the item you want to reorder, setting the `addLongPressReorderable` attribute to true (this attribute is in the `AutomaticAnimatedListView`, `AnimatedListView` and` AnimatedSliverChildBuilderDelegate` classes).
 
-In addition you have to pass a model to the `reorderModel` attribute by extending the` AnimatedListBaseReorderModel` class.
+In addition you have to pass a model to the `reorderModel` attribute by extending the `AnimatedListBaseReorderModel` class.
 You can also use the callback function-based `AnimatedListReorderModel` version, saving you from creating a new derived class.
 
 The fastest way to add support for reordering for all items is to use a `AutomaticAnimatedListView` widget and pass an instance of the `AutomaticAnimatedListReorderModel` class (it requires as input the same list you pass to the list view via the `list` attribute).
@@ -875,6 +900,7 @@ class _BodyState extends State<Body> {
   @override
   Widget build(BuildContext context) {
     return Scrollbar(
+      controller: scrollController,
       child: AutomaticAnimatedListView<ItemData>(
         list: currentList,
         comparator: AnimatedListDiffListComparator<ItemData>(
@@ -888,6 +914,7 @@ class _BodyState extends State<Body> {
         listController: controller,
         addLongPressReorderable: true,
         reorderModel: AutomaticAnimatedListReorderModel(currentList),
+        scrollController: scrollController,
       ),
     );
   }
@@ -941,6 +968,7 @@ List<ItemData> listB = [
   ItemData(8, Colors.yellowAccent)
 ];
 
+final scrollController = ScrollController();
 final controller = AnimatedListController();
 final gkey = GlobalKey<_BodyState>();
 ```
@@ -993,6 +1021,7 @@ class Body extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scrollbar(
+      controller: scrollController,
       child: AnimatedListView(
         initialItemCount: list.length,
         itemBuilder: (context, index, data) => data.measuring
@@ -1014,6 +1043,7 @@ class Body extends StatelessWidget {
             return true;
           },
         ),
+        scrollController: scrollController,
       ),
     );
   }
@@ -1060,8 +1090,6 @@ List<ItemData> list = [
   for (var i = 1; i <= 10; i++) ItemData(++id, (id - 1) % 4)
 ];
 
-final controller = AnimatedListController();
-
 var r = Random();
 
 void randomChange() {
@@ -1076,7 +1104,7 @@ void randomChange() {
           (context, index, data) => Item(data: subList[index]));
       break;
     case 1: // insert
-      final from = list.isEmpty ? 0 : r.nextInt(list.length);
+      final from = r.nextInt(list.length + 1);
       final count = 1 + r.nextInt(5);
       list.insertAll(from, [for (var i = 0; i < count; i++) ItemData(++id)]);
       controller.notifyInsertedRange(from, count);
@@ -1094,17 +1122,19 @@ void randomChange() {
     case 3: // change
       final from = r.nextInt(list.length);
       final to = from + 1 + r.nextInt(list.length - from);
-      final count = to - from;
       final subList = list.sublist(from, to);
       list.replaceRange(from, to, [
-        for (var i = 0; i < count; i++)
+        for (var i = 0; i < to - from; i++)
           ItemData(subList[i].id, subList[i].color + 1)
       ]);
-      controller.notifyChangedRange(
-          from, count, (context, index, data) => Item(data: subList[index]));
+      controller.notifyChangedRange(from, to - from,
+          (context, index, data) => Item(data: subList[index]));
       break;
   }
 }
+
+final scrollController = ScrollController();
+final controller = AnimatedListController();
 ```
 
 If you want to implement a custom reordering, for example based on dragging an handle instead of long pressing the item, you will have to use the controller again to notify the various steps of the reordering process, calling the `notifyStartReorder`, `notifyUpdateReorder` and `notifyStopReorder` methods.
@@ -1171,6 +1201,7 @@ class _BodyState extends State<Body> {
   @override
   Widget build(BuildContext context) {
     return Scrollbar(
+      controller: scrollController,
       child: AutomaticAnimatedListView<ItemData>(
         list: currentList,
         comparator: AnimatedListDiffListComparator<ItemData>(
@@ -1183,6 +1214,8 @@ class _BodyState extends State<Body> {
             : Item(data: item),
         listController: controller,
         reorderModel: AutomaticAnimatedListReorderModel(currentList),
+        addLongPressReorderable: false,
+        scrollController: scrollController,
       ),
     );
   }
@@ -1256,6 +1289,7 @@ List<ItemData> listB = [
   ItemData(8, Colors.yellowAccent)
 ];
 
+final scrollController = ScrollController();
 final controller = AnimatedListController();
 final gkey = GlobalKey<_BodyState>();
 ```
@@ -1272,7 +1306,7 @@ An example of the use of the feedback is shown in the tree list adapter example 
 
 Does you data consist of nodes in a hierarchical tree and you need a tree view to show them? No problem, you can use the `TreeistAdapter` class to convert the nodes to a linear list.
 Each node will therefore be an item of a list view corresponding to a specific index.
-The `nodeToIndex` and` indexToNode` methods can be used the former to determine the list index of a particular node and the latter to determine the node corresponding to a given index.
+The `nodeToIndex` and `indexToNode` methods can be used the former to determine the list index of a particular node and the latter to determine the node corresponding to a given index.
 The class internally uses a window that shows only a part of the tree properly converted into a linear list. Each time the index of a new node is requested, the window will be moved to contain that node.
 
 In order to perform this conversion, the adapter needs a model that describes the tree.
@@ -1549,9 +1583,7 @@ final controller = AnimatedListController();
 
 The `AnimatedListController` object provides other useful methods for obtaining information about the placement of items.
 
-The `listToActualItemIndex` and `actualToListItemIndex` methods allow you to convert the index of an item referring to the underlying list to the index of the item actually builded in the list view and vice versa. Obviously the two indices differ only if there are animations in progress.
-
-Another useful method is `computeItemBox` which allows you to retrieve the box position of an item builded in the list view. This method is often used in conjunction with the `jumpTo` and` animateTo` methods of a `ScrollController` to scroll to a certain item.
+Another useful method is `computeItemBox` which allows you to retrieve the box position of an item. This method is often used in conjunction with the `jumpTo` and` animateTo` methods of a `ScrollController` to scroll to a certain item.
 
 It is also possible to position at a certain scroll offset when the list view is built for the first time using
 the `initialScrollOffsetCallback` attribute of the `AnimatedSliverChildDelegate`, `AnimatedListView` and `AutomaticAnimatedListView` classes; a callback function has to be passed that is invoked at the first layout of the list view, and it has to return the offset to be positioned at the beginning.
@@ -1589,10 +1621,10 @@ class Body extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scrollbar(
+      controller: scrollController,
       child: AutomaticAnimatedListView<ItemData>(
         list: myList,
         listController: controller,
-        scrollController: scrollController,
         comparator: AnimatedListDiffListComparator<ItemData>(
             sameItem: (a, b) => a.id == b.id,
             sameContent: (a, b) =>
@@ -1603,13 +1635,12 @@ class Body extends StatelessWidget {
             : Item(data: item),
         initialScrollOffsetCallback: (c) {
           final i = rnd.nextInt(myList.length);
-          final box = controller.computeItemBox(i, true);
-          if (box != null) {
-            print('scrolled to item ${myList[i]}');
-            return max(
-                0.0, box.top - (c.viewportMainAxisExtent - box.height) / 2.0);
-          }
+          final box = controller.computeItemBox(i, true)!;
+          print('scrolled to item ${myList[i]}');
+          return max(
+              0.0, box.top - (c.viewportMainAxisExtent - box.height) / 2.0);
         },
+        scrollController: scrollController,
       ),
     );
   }
@@ -1627,9 +1658,7 @@ class Item extends StatelessWidget {
     return GestureDetector(
         onTap: () {
           final listIndex = rnd.nextInt(myList.length);
-          final actualIndex = controller.listToActualItemIndex(listIndex);
-          if (actualIndex == null) return;
-          final box = controller.computeItemBox(actualIndex);
+          final box = controller.computeItemBox(listIndex, true);
           if (box == null) return;
           print('scrolled to item ${myList[listIndex]}');
           final c = context
@@ -1674,6 +1703,6 @@ List<ItemData> myList = [
   for (; n <= 40; n++) ItemData(n, Colors.red, 120),
 ];
 
-final controller = AnimatedListController();
 final scrollController = ScrollController();
+final controller = AnimatedListController();
 ```

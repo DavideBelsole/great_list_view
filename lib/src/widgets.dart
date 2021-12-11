@@ -1,4 +1,12 @@
-part of 'core.dart';
+library great_list_view;
+
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+
+import 'core/core.dart';
+import 'delegates.dart';
+import 'dispatcher.dart';
+import 'morph_transition.dart';
 
 /// A scrollable and animated list of widgets arranged linearly, inspired by [ListView].
 class AnimatedListView extends BoxScrollView {
@@ -12,7 +20,7 @@ class AnimatedListView extends BoxScrollView {
   /// - `animator`, an [AnimatedListAnimator] used to customize all the animations;
   /// - `addLongPressReorderable`, used to wrap each item in a [LongPressReorderable] (see also
   ///   [AnimatedSliverChildBuilderDelegate.addLongPressReorderable]);
-  /// - `addAnimatedElevation`, used to wrap each item in a [AnimatedElevation] (see also
+  /// - `addAnimatedElevation`, used to wrap each item in a [Material] (see also
   ///   [AnimatedSliverChildBuilderDelegate.addAnimatedElevation]);
   /// - `addFadeTransition`, used to wrap each item in a [FadeTransition] (see also
   ///   [AnimatedSliverChildBuilderDelegate.addFadeTransition]);
@@ -28,13 +36,15 @@ class AnimatedListView extends BoxScrollView {
     this.itemExtent,
     AnimatedListAnimator animator = const DefaultAnimatedListAnimator(),
     bool addLongPressReorderable = true,
-    bool addAnimatedElevation = true,
+    double addAnimatedElevation = kDefaultAnimatedElevation,
     bool addFadeTransition = true,
     MorphComparator? morphComparator,
     bool morphResizeWidgets = true,
     Duration morphDuration = const Duration(milliseconds: 500),
     AnimatedListBaseReorderModel? reorderModel,
     InitialScrollOffsetCallback? initialScrollOffsetCallback,
+    void Function(int, int)? didFinishLayoutCallback,
+    bool holdScrollOffset = false,
     //
     Axis scrollDirection = Axis.vertical,
     bool reverse = false,
@@ -70,6 +80,8 @@ class AnimatedListView extends BoxScrollView {
           morphComparator: morphComparator,
           reorderModel: reorderModel,
           initialScrollOffsetCallback: initialScrollOffsetCallback,
+          didFinishLayoutCallback: didFinishLayoutCallback,
+          holdScrollOffset: holdScrollOffset,
         ),
         super(
           key: key,
@@ -160,7 +172,7 @@ abstract class AnimatedSliverMultiBoxAdaptorWidget
 
   final AnimatedSliverChildDelegate delegate;
 
-  static _ControllerInterface? of(BuildContext context) {
+  static AnimatedSliverMultiBoxAdaptorElement? of(BuildContext context) {
     try {
       return context
           .findAncestorRenderObjectOfType<AnimatedRenderSliverList>()
@@ -229,13 +241,15 @@ class AutomaticAnimatedListView<T> extends AnimatedListView {
     required this.comparator,
     AnimatedListAnimator animator = const DefaultAnimatedListAnimator(),
     bool addLongPressReorderable = true,
-    bool addAnimatedElevation = true,
+    double addAnimatedElevation = kDefaultAnimatedElevation,
     bool addFadeTransition = true,
     bool morphResizeWidgets = true,
     Duration morphDuration = const Duration(milliseconds: 500),
     MorphComparator? morphComparator,
     AnimatedListBaseReorderModel? reorderModel,
     InitialScrollOffsetCallback? initialScrollOffsetCallback,
+    void Function(int, int)? didFinishLayoutCallback,
+    bool holdScrollOffset = false,
     //
     Axis scrollDirection = Axis.vertical,
     bool reverse = false,
@@ -289,6 +303,8 @@ class AutomaticAnimatedListView<T> extends AnimatedListView {
             morphComparator: morphComparator,
             reorderModel: reorderModel,
             initialScrollOffsetCallback: initialScrollOffsetCallback,
+            didFinishLayoutCallback: didFinishLayoutCallback,
+            holdScrollOffset: holdScrollOffset,
           ),
         );
 
@@ -335,8 +351,7 @@ class _DiffDispatcherWidgetState<T> extends State<_DiffDispatcherWidget<T>> {
   AnimatedListDiffListDispatcher<T>? _dispatcher;
 
   void _createDispatcher() {
-    final oldProcessingList = _dispatcher?._processingList;
-    _dispatcher?._processingList = null;
+    final oldProcessingList = _dispatcher?.discard();
     _dispatcher = AnimatedListDiffListDispatcher<T>(
       controller: widget.controller,
       currentList: _dispatcher?.currentList ?? widget.list,
@@ -407,27 +422,27 @@ class LongPressReorderable extends StatelessWidget {
 
   final Widget child;
 
-  AnimatedRenderSliverMultiBoxAdaptor? _findRenderSliver(BuildContext context) {
-    return (AnimatedSliverMultiBoxAdaptorWidget.of(context)
-            as AnimatedSliverMultiBoxAdaptorElement?)
-        ?.renderObject;
+  AnimatedListController? _findListController(BuildContext context) {
+    return (AnimatedSliverMultiBoxAdaptorWidget.of(context))
+        ?.widget
+        .listController;
   }
 
   void _onLongPressStart(BuildContext context, LongPressStartDetails d) {
-    final renderObject = _findRenderSliver(context);
-    renderObject?._reorderStart(
+    final controller = _findListController(context);
+    controller?.notifyStartReorder(
         context, d.localPosition.dx, d.localPosition.dy);
   }
 
   void _onLongPressMoveUpdate(
       BuildContext context, LongPressMoveUpdateDetails d) {
-    final renderObject = _findRenderSliver(context);
-    renderObject?._reorderUpdate(d.localPosition.dx, d.localPosition.dy);
+    final controller = _findListController(context);
+    controller?.notifyUpdateReorder(d.localPosition.dx, d.localPosition.dy);
   }
 
   void _onLongPressEnd(BuildContext context, LongPressEndDetails d) {
-    final renderObject = _findRenderSliver(context);
-    renderObject?._reorderStop(false);
+    final controller = _findListController(context);
+    controller?.notifyStopReorder(false);
   }
 
   @override

@@ -1,4 +1,12 @@
-part of 'core.dart';
+library great_list_view;
+
+import 'dart:async';
+
+import 'package:diffutil_dart/diffutil.dart';
+import 'package:flutter/widgets.dart';
+import 'package:worker_manager/worker_manager.dart';
+
+import 'core/core.dart';
 
 const int _kSpawnNewIsolateCount = 500;
 
@@ -104,8 +112,6 @@ class AnimatedListDiffDispatcher<T> {
 
     final oldList = _oldList!;
 
-    // onBeforeDispatch(dr, oldList, _currentList);
-
     controller.batch(() {
       dr._dispatchUpdatesTo(
         onInsert: (position, count) {
@@ -164,6 +170,14 @@ class AnimatedListDiffDispatcher<T> {
     } else {
       return _calculateDiff(oldList, newList, comparator);
     }
+  }
+
+  /// Stops this dispatcher from processing the Meyes algorithm and returns
+  /// the list is currently being processed, if any.
+  T? discard() {
+    final list = _processingList;
+    _processingList = null;
+    return list;
   }
 }
 
