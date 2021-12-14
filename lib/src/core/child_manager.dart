@@ -18,7 +18,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
       AnimatedSliverMultiBoxAdaptorWidget widget)
       : super(widget);
 
-  /// support for the method didChangeDependencies like in [State.didChangeDependencies].
+  /// Support for the method didChangeDependencies like in [State.didChangeDependencies].
   bool _didChangeDependencies = false;
 
   @override
@@ -68,40 +68,40 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
     }
   }
 
-  // This function takes the old index of a child and calculates the new one by considering
-  // all the pending updates.
-  // This method can return `null` if the child no longer exists (for example,
-  // all elements of a remove interval disappear when it becomes a resizing interval).
-  ReindexResult oldIndexToNewIndex(List<_Update> updates, int index) {
+  /// This function takes the old [index] of a child and calculates the new one by considering
+  /// all the pending [updates].
+  /// This method can return `null` if the child no longer exists (for example,
+  /// all elements of a remove interval disappear when it becomes a resizing interval).
+  _ReindexResult _oldIndexToNewIndex(List<_Update> updates, int index) {
     var needsRebuild = false;
     var clearLayoutOffset = false;
-    var reorderDrop = false;
-    var reorderPick = false;
     var discardElement = false;
+    var popupDrop = false;
+    var popupPick = false;
     _PopUpList? popUpList;
     for (final upd in updates) {
-      assert(upd.flags.checkIntegrity());
       if (index >= upd.index && index < upd.index + upd.oldBuildCount) {
         if (index >= upd.index + upd.newBuildCount) {
-          // is upd.newBuildCount < upd.oldBuildCount
-          return ReindexResult(null, needsRebuild, discardElement,
-              clearLayoutOffset, reorderPick, reorderDrop, popUpList);
+          // it is upd.newBuildCount < upd.oldBuildCount
+          return _ReindexResult(null, needsRebuild, discardElement,
+              clearLayoutOffset, popupPick, popupDrop, popUpList);
         }
         if (upd.flags.hasClearLayoutOffset) {
           if (index != upd.index || !upd.flags.hasKeepFirstLayoutOffset) {
             clearLayoutOffset = true;
           }
         }
-        if (upd.flags.hasReorderDrop) {
-          if (reorderPick) {
-            reorderPick = false;
+        if (upd.flags.hasPopupDrop) {
+          if (popupPick) {
+            // TODO: to be checked
+            popupPick = false;
             popUpList = null;
           } else {
-            reorderDrop = true;
+            popupDrop = true;
             popUpList = upd.popUpList;
           }
-        } else if (upd.flags.hasReorderPick) {
-          reorderPick = true;
+        } else if (upd.flags.hasPopupPick) {
+          popupPick = true;
           popUpList = upd.popUpList;
         }
         needsRebuild = true;
@@ -111,27 +111,9 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
       }
       if (index >= upd.index + upd.oldBuildCount) index += upd.skipCount;
     }
-    return ReindexResult(index, needsRebuild, discardElement, clearLayoutOffset,
-        reorderPick, reorderDrop, popUpList);
+    return _ReindexResult(index, needsRebuild, discardElement,
+        clearLayoutOffset, popupPick, popupDrop, popUpList);
   }
-
-  // String qqq() {
-  //   var s = "{";
-  //   _childElements.forEach((key, value) {
-  //     s += "$key: #${identityHashCode(value)}, ";
-  //   });
-  //   s += "}\n{";
-  //   var child = renderObject.firstChild;
-  //   while (child != null) {
-  //     final e = _childElements.values
-  //         .singleWhereOrNull((e) => e?.renderObject == child);
-  //     s +=
-  //         "${renderObject._parentDataOf(child)?.index}: #${e != null ? identityHashCode(e) : "NULL"}, ";
-  //     child = renderObject.childAfter(child);
-  //   }
-  //   s += "}";
-  //   return s;
-  // }
 
   /// Inspired by [SliverMultiBoxAdaptorElement.performRebuild].
   ///
@@ -141,8 +123,8 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   /// It considers all pending build updates to move each old last rendered child
   /// to its new position.
   ///
-  /// It also calls the [AnimatedRenderSliverList.didChangeDependencies] method if a dependency
-  /// has been changed.
+  /// It also calls the [AnimatedRenderSliverMultiBoxAdaptor.didChangeDependencies] method
+  /// if a dependency has been changed.
   @override
   void performRebuild() {
     if (_didChangeDependencies) {
@@ -152,20 +134,20 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
 
     super.performRebuild();
 
-    _currentBeforeChild = null;
-    // var childrenUpdated = false;
     assert(_currentlyUpdatingChildIndex == null);
+    _currentBeforeChild = null;
     try {
       final newChildren = SplayTreeMap<int, Element?>();
-      // final rebuildChildren = HashSet<int>();
 
-      renderObject.debugChildIntegrityEnabled =
-          false; // Moving children will temporary violate the integrity.
+      // moving children will temporary violate the integrity
+      renderObject.debugChildIntegrityEnabled = false;
 
       for (final popUpList in _intervalList.popUpLists) {
-        final r = oldIndexToNewIndex(popUpList.updates, 0);
+        final r = _oldIndexToNewIndex(popUpList.updates, 0);
+        popUpList.updates.clear();
         if (r.needsRebuild) {
-          if (popUpList is _ReorderPopUpList) {
+          // TODO: to be revisited
+          if (popUpList is _SingleElementPopUpList) {
             _currentlyUpdatingChildIndex = null;
             popUpList.element = updateChild(
                 popUpList.element, _build(0, popUpList: popUpList), null);
@@ -175,15 +157,17 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
           _intervalList.popUpLists.remove(popUpList);
         }
       }
+
       for (int? index in _childElements.keys.toList()) {
         Element? element = _childElements[index]!;
         var childParentData = _parentDataOf(element);
 
-        final r = oldIndexToNewIndex(_intervalList.updates, index!);
+        final r = _oldIndexToNewIndex(_intervalList.updates, index!);
 
-        if (r.reorderPick) {
+        // TODO: to be revisited
+        if (r.popUpPick) {
           assert(r.needsRebuild);
-          final rl = r.popUpList as _ReorderPopUpList;
+          final rl = r.popUpList as _SingleElementPopUpList;
           rl.element = updateChild(element, _build(0, popUpList: rl), index)!;
           element = null;
           final renderBox = rl.element!.renderObject as RenderBox;
@@ -191,19 +175,19 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
           renderObject.adoptChild(renderBox);
         }
 
-        if (r.reorderDrop) {
+        // TODO: to be revisited
+        if (r.popUpDrop) {
           final layoutOffset = renderObject
               .childScrollOffset(element!.renderObject as RenderBox);
           _currentlyUpdatingChildIndex = index;
           updateChild(element, null, index);
-          final rl = r.popUpList as _ReorderPopUpList;
-          element = rl.element!;
+          element = r.popUpList!.elements.first;
           final renderBox = element.renderObject as RenderBox;
           renderObject.dropChild(renderBox);
           renderObject.insert(renderBox, after: _currentBeforeChild);
           (renderBox.parentData! as SliverMultiBoxAdaptorParentData)
               .layoutOffset = layoutOffset;
-          rl.element = null;
+          r.popUpList!.clearElements();
         }
 
         if (r.newIndex == null) {
@@ -222,7 +206,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
             element = updateChild(element, _build(r.newIndex!), r.newIndex)!;
           } else {
             if (index != r.newIndex) {
-              // only update slot
+              // just update the slot
               updateChild(element, element!.widget, r.newIndex);
             }
           }
@@ -238,7 +222,6 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
       _childElements = newChildren;
     } finally {
       _currentlyUpdatingChildIndex = null;
-
       renderObject.debugChildIntegrityEnabled = true;
       _intervalList.updates.clear();
     }
@@ -262,7 +245,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   int get childCount => _intervalList.buildItemCount;
 
   /// Copied from [SliverMultiBoxAdaptorElement.estimateMaxScrollOffset].
-  /// The [AnimatedSliverChildBuilderDelegate.estimateMaxScrollOffset] method call
+  /// The [SliverMultiBoxAdaptorWidget.estimateMaxScrollOffset] method call
   /// has been removed just now.
   @override
   double estimateMaxScrollOffset(
@@ -272,7 +255,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
     final double? leadingScrollOffset,
     final double? trailingScrollOffset,
   }) {
-    return renderObject.extrapolateMaxScrollOffset(firstIndex!, lastIndex!,
+    return renderObject._extrapolateMaxScrollOffset(firstIndex!, lastIndex!,
         leadingScrollOffset!, trailingScrollOffset!, childCount)!;
   }
 
@@ -435,7 +418,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   }
 
   /// Copied from [SliverMultiBoxAdaptorElement.visitChildren].
-  /// This method has been changed to include the dragged element during reording.
+  /// This method has been changed to include pop-up elements.
   @override
   void visitChildren(final ElementVisitor visitor) {
     assert(!_childElements.values.any((Element? child) => child == null));
@@ -478,6 +461,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   }
 
   /// Copied from [SliverMultiBoxAdaptorElement.didFinishLayout].
+  // TODO: to be changed; firstChild and lastChild should be used and item index conversion applied.
   @override
   void didFinishLayout() {
     assert(debugAssertChildListLocked());
@@ -486,12 +470,8 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
     widget.delegate.didFinishLayout(firstIndex, lastIndex);
   }
 
-  //
-  // Support methods
-  //
-
-  /// Searchs and returns the list index of specified item by its [context], if it can be found.
-  int? buildIndexFromContext(BuildContext context) {
+  /// Searchs and returns the build index of specified item by its [context], if it can be found.
+  int? _buildIndexFromContext(BuildContext context) {
     if (context is! Element) return null;
     int? slot;
     if (context.slot is! int) {
@@ -562,18 +542,24 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
     renderObject._resizingIntervalUpdated(interval, delta);
   }
 
-  /// Measure the size of a bunch of off-list children up to [count] elements.
+  /// Measures the size of a bunch of off-list children up to [count] elements.
   /// You have to provide a [builder] to build the `i`-th widget.
   /// The calculation is asynchronous and can be [cancelled].
   @override
   Future<_Measure> measureItems(
       _Cancelled? cancelled, int count, IndexedWidgetBuilder builder) async {
-    return await renderObject.measureItems(cancelled, count, builder);
+    return await renderObject._measureItems(cancelled, count, builder);
   }
 
+  /// Measures the size of the [widget].
   @override
   double measureItem(Widget widget) {
     return renderObject.measureItem(widget);
+  }
+
+  @override
+  void markNeedsLayout() {
+    renderObject._markSafeNeedsLayout();
   }
 
   //
@@ -680,7 +666,10 @@ Widget _createErrorWidget(Object exception, StackTrace stackTrace) {
   return ErrorWidget.builder(details);
 }
 
-class ReindexResult {
+class _ReindexResult {
+  const _ReindexResult(this.newIndex, this.needsRebuild, this.discardElement,
+      this.clearLayoutOffset, this.popUpPick, this.popUpDrop, this.popUpList);
+
   /// The new index of the child.
   final int? newIndex;
 
@@ -696,20 +685,11 @@ class ReindexResult {
   final bool clearLayoutOffset;
 
   /// Marks the child to be picked up and its [Element] to be moved into the [popUpList].
-  final bool reorderPick;
+  final bool popUpPick;
 
   /// Marks the child to be dropped and its [Element] to be moved from the [popUpList] into the main list.
-  final bool reorderDrop;
+  final bool popUpDrop;
 
-  /// The [_PopUpList] referred to [reorderPick] or [reorderDrop].
+  /// The [_PopUpList] referred to [popUpPick] or [popUpDrop].
   final _PopUpList? popUpList;
-
-  const ReindexResult(
-      this.newIndex,
-      this.needsRebuild,
-      this.discardElement,
-      this.clearLayoutOffset,
-      this.reorderPick,
-      this.reorderDrop,
-      this.popUpList);
 }

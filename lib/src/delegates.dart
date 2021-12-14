@@ -7,18 +7,40 @@ import 'core/core.dart';
 import 'morph_transition.dart';
 import 'widgets.dart';
 
+/// Default duration of a dismiss or incoming animation.
 const Duration kDismissOrIncomingAnimationDuration =
     Duration(milliseconds: 500);
+
+/// Default duration of a resizing animation.
 const Duration kResizeAnimationDuration = Duration(milliseconds: 500);
+
+/// Default duration of a reordering animation.
 const Duration kReorderAnimationDuration = Duration(milliseconds: 250);
 
+/// Default duration of a moving animation.
+const Duration kMovingAnimationDuration = Duration(milliseconds: 250);
+
+/// Default curve of a dismiss or incoming animation.
 const Curve kDismissOrIncomingAnimationCurve = Curves.ease;
+
+/// Default curve of a resizing animation.
 const Curve kResizeAnimationCurve = Curves.easeInOut;
+
+/// Default curve of a reordering animation.
 const Curve kReorderAnimationCurve = Curves.linear;
 
+/// Default curve of a moving animation.
+const Curve kMovingAnimationCurve = Curves.easeInOut;
+
+/// Default value of the [Material.elevation].
 const double kDefaultAnimatedElevation = 10.0;
 
-/// A delegate that supplies children for animated slivers, inspired by [SliverChildDelegate].
+/// Default duration of the [MorphTransition] effect.
+const Duration kDefaultMorphTransitionDuration = Duration(milliseconds: 500);
+
+/// A delegate that supplies children for animated slivers.
+///
+/// This class has been inspired by [SliverChildDelegate].
 abstract class AnimatedSliverChildDelegate {
   const AnimatedSliverChildDelegate();
 
@@ -28,24 +50,24 @@ abstract class AnimatedSliverChildDelegate {
   /// Provides the builder of the items currently present in the undelying list.
   AnimatedWidgetBuilder get builder;
 
-  /// Wrap a built child widget adding extra visual effects, animations and other.
+  /// Wrap a built child widget adding extra visual effects, animations and others.
   Widget wrapWidget(
       BuildContext context, Widget widget, AnimatedWidgetBuilderData data);
 
   /// Provides an animator to customize all the animations.
   AnimatedListAnimator get animator;
 
-  /// Provides a model (a bunch of callbacks) to handle reorders.
+  /// Provides a model (a bunch of callbacks) to handle reordering.
   AnimatedListBaseReorderModel? get reorderModel;
 
+  /// A function that is called at the very early stage to give you the option to return the initial scroll offset.
   InitialScrollOffsetCallback? get initialScrollOffsetCallback;
 
+  /// Whether to prevent scrolling up when the above items not visibile are modified.
   bool get holdScrollOffset;
 
   /// See [SliverChildDelegate.didFinishLayout].
   /// The indices refer to the actual items built in the list view.
-  /// Use the [AnimatedListController.actualToListItemIndex] method to convert them to their respective
-  /// indexes in the underlyng list.
   void didFinishLayout(int firstIndex, int lastIndex) {}
 
   @override
@@ -58,23 +80,27 @@ abstract class AnimatedSliverChildDelegate {
 /// Inspired by [SliverChildBuilderDelegate].
 class AnimatedSliverChildBuilderDelegate extends AnimatedSliverChildDelegate {
   /// See [SliverChildBuilderDelegate.addAutomaticKeepAlives] for details.
+  ///
+  /// Defaults to `true`.
   final bool addAutomaticKeepAlives;
 
   /// See [SliverChildBuilderDelegate.addRepaintBoundaries] for details.
+  ///
+  /// Defaults to `true`.
   final bool addRepaintBoundaries;
 
   // final bool addSemanticIndexes;
   // final int semanticIndexOffset;
   // final SemanticIndexCallback semanticIndexCallback;
 
-  /// Whether to wrap each child in a [LongPressReorderable].
+  /// Whether to wrap each child in a [LongPressReorderable], if a reorder model has been provided.
   ///
   /// This allows the items to be dragged for reordering purpose with a long press gesture.
   ///
-  /// Defaults to true.
+  /// Defaults to `true`.
   final bool addLongPressReorderable;
 
-  /// Whether to wrap each child in a [Material].
+  /// Whether to wrap each child in a [Material], if a reorder model has been provided.
   ///
   /// An elevation effect is automatically applied to the item picked up for reordering.
   /// If the value is `0.0` the child is not wrapped at all.
@@ -87,7 +113,7 @@ class AnimatedSliverChildBuilderDelegate extends AnimatedSliverChildDelegate {
   ///
   /// A fade effect is automatically applied to dismissing and incoming items.
   ///
-  /// Defaults to true.
+  /// Defaults to `true`.
   final bool addFadeTransition;
 
   /// If provided, it wraps each child in a [MorphTransition].
@@ -98,41 +124,72 @@ class AnimatedSliverChildBuilderDelegate extends AnimatedSliverChildDelegate {
   /// content is different from the old one. Avoid returning `false` when not needed, in order
   /// not to apply the effect unnecessarily when the two compared widgets are identical.
   ///
-  /// Defaults to null.
+  /// Defaults to `null`.
   final MorphComparator? morphComparator;
 
-  /// Whether to resize the widget it is changing when applying the [MorphTransition] effect.
+  /// Whether to resize the widget that is changing when applying the [MorphTransition] effect.
   /// If `false`, the widget with the largst content will be cropped during the animation.
   /// See also [MorphTransition.resizeWidgets].
   ///
-  /// Defaults to true.
+  /// Defaults to `true`.
   final bool morphResizeWidgets;
 
+  /// The duration of the [MorphTransition] effect.
+  ///
+  /// Defaults to [kDefaultMorphTransitionDuration].
   final Duration morphDuration;
 
+  /// Whether to prevent scrolling up when the above items not visibile are modified.
+  /// See [AnimatedSliverChildDelegate.holdScrollOffset].
+  ///
+  /// Defaults to `false`.
   @override
   final bool holdScrollOffset;
 
+  /// A function that is called at the very early stage to give you the option to return the initial scroll offset.
+  /// If `null` not callback will be invoked.
+  /// See [AnimatedSliverChildDelegate.initialScrollOffsetCallback].
+  ///
+  /// Defaults to `null`.
   @override
   final InitialScrollOffsetCallback? initialScrollOffsetCallback;
 
-  /// Provides a model (a bunch of callbacks) to handle reorders.
+  /// Provides a model (a bunch of callbacks) that handles reordering.
   /// If `null` the list view cannot be reordered.
+  /// See [AnimatedSliverChildDelegate.reorderModel].
   ///
-  /// Defaults to null.
+  /// Defaults to `null`.
   @override
   final AnimatedListBaseReorderModel? reorderModel;
 
   /// Provides the builder of the items currently present in the underlying list.
+  /// See [AnimatedSliverChildDelegate.builder].
   @override
   final AnimatedWidgetBuilder builder;
 
   /// Provides an animator to customize all the animations.
+  /// See [AnimatedSliverChildDelegate.animator].
   ///
   /// Defaults to an instance of [DefaultAnimatedListAnimator].
   @override
   final AnimatedListAnimator animator;
 
+  /// The initial count of the children present in the underlying list.
+  /// This attribute is only read during the first build.
+  /// See [AnimatedSliverChildDelegate.initialChildCount].
+  @override
+  final int initialChildCount;
+
+  /// The callback [didFinishLayoutCallback] will be invoked, if any.
+  ///
+  /// See [AnimatedSliverChildDelegate.didFinishLayout] for more information.
+  @override
+  void didFinishLayout(int firstIndex, int lastIndex) =>
+      didFinishLayoutCallback?.call(firstIndex, lastIndex);
+
+  /// The callback to be invoked on [AnimatedSliverChildDelegate.didFinishLayout].
+  ///
+  /// Defaults to `null`.
   final void Function(int, int)? didFinishLayoutCallback;
 
   AnimatedSliverChildBuilderDelegate(
@@ -145,10 +202,10 @@ class AnimatedSliverChildBuilderDelegate extends AnimatedSliverChildDelegate {
     // this.semanticIndexOffset = 0,
     this.animator = const DefaultAnimatedListAnimator(),
     this.addLongPressReorderable = true,
-    this.addAnimatedElevation = 0.0,
+    this.addAnimatedElevation = kDefaultAnimatedElevation,
     this.addFadeTransition = true,
     this.morphResizeWidgets = true,
-    this.morphDuration = const Duration(milliseconds: 500),
+    this.morphDuration = kDefaultMorphTransitionDuration,
     this.morphComparator,
     this.reorderModel,
     this.initialScrollOffsetCallback,
@@ -157,6 +214,7 @@ class AnimatedSliverChildBuilderDelegate extends AnimatedSliverChildDelegate {
   })  : assert(initialChildCount >= 0),
         initialChildCount = initialChildCount;
 
+  /// See [AnimatedSliverChildDelegate.wrapWidget].
   @override
   Widget wrapWidget(
       BuildContext context, Widget child, AnimatedWidgetBuilderData data) {
@@ -169,7 +227,7 @@ class AnimatedSliverChildBuilderDelegate extends AnimatedSliverChildDelegate {
           comparator: morphComparator!,
           child: child);
     }
-    if (addAnimatedElevation != 0.0) {
+    if (addAnimatedElevation != 0.0 && reorderModel != null) {
       child = Material(
         elevation: data.dragging ? addAnimatedElevation : 0.0,
         child: child,
@@ -196,15 +254,6 @@ class AnimatedSliverChildBuilderDelegate extends AnimatedSliverChildDelegate {
     }
     return KeyedSubtree(key: key, child: child);
   }
-
-  /// The initial count of the children present in the underlying list.
-  /// This attribute is only read on the first build.
-  @override
-  final int initialChildCount;
-
-  @override
-  void didFinishLayout(int firstIndex, int lastIndex) =>
-      didFinishLayoutCallback?.call(firstIndex, lastIndex);
 }
 
 /// This interface can be implemented to customize all animations.
@@ -219,9 +268,9 @@ abstract class AnimatedListAnimator {
   AnimatedListAnimationData incoming();
 
   /// Provides info about the animation of an incoming item that doesn't complete and
-  /// turns into an outgoing item.
-  /// The current [time] of the incoming animation is provided (0 indicates it is
-  /// just started whereas 1 is pratically completed).
+  /// is turning into an outgoing item.
+  /// The current [time] of the incoming animation is provided (`0` indicates that is
+  /// just started whereas `1` is pratically completed).
   AnimatedListAnimationData dismissDuringIncoming(double time);
 
   /// Provides info about the animation of a resizing interval (space between items)
@@ -234,23 +283,32 @@ abstract class AnimatedListAnimator {
   /// The starting [fromSize] and ending [toSize] sizes of the interval are also provided.
   AnimatedListAnimationData resizingDuringReordering(
       double fromSize, double toSize);
+
+  /// Provides info about the animation of a moving item.
+  AnimatedListAnimationData moving();
 }
 
 /// Default implementation of the inteface [AnimatedListAnimator] that uses [CurveTween]s objects.
 /// Custom animation durations and curves can also be provided.
 class DefaultAnimatedListAnimator extends AnimatedListAnimator {
-  final Duration dismissIncomingDuration, resizeDuration, reorderDuration;
-  final Curve dismissIncomingCurve, resizeCurve, reorderCurve;
-
   const DefaultAnimatedListAnimator({
     this.dismissIncomingDuration = kDismissOrIncomingAnimationDuration,
     this.resizeDuration = kResizeAnimationDuration,
     this.reorderDuration = kReorderAnimationDuration,
+    this.movingDuration = kMovingAnimationDuration,
     this.dismissIncomingCurve = kDismissOrIncomingAnimationCurve,
     this.resizeCurve = kResizeAnimationCurve,
     this.reorderCurve = kReorderAnimationCurve,
+    this.movingCurve = kMovingAnimationCurve,
   });
 
+  final Duration dismissIncomingDuration,
+      resizeDuration,
+      reorderDuration,
+      movingDuration;
+  final Curve dismissIncomingCurve, resizeCurve, reorderCurve, movingCurve;
+
+  /// See [AnimatedListAnimator.dismissDuringIncoming].
   @override
   AnimatedListAnimationData dismissDuringIncoming(double dismissTime) {
     return AnimatedListAnimationData(
@@ -260,6 +318,7 @@ class DefaultAnimatedListAnimator extends AnimatedListAnimator {
         1.0 - dismissTime);
   }
 
+  /// See [AnimatedListAnimator.dismiss].
   @override
   AnimatedListAnimationData dismiss() {
     return AnimatedListAnimationData(
@@ -268,34 +327,44 @@ class DefaultAnimatedListAnimator extends AnimatedListAnimator {
         dismissIncomingDuration);
   }
 
+  /// See [AnimatedListAnimator.incoming].
   @override
   AnimatedListAnimationData incoming() {
     return AnimatedListAnimationData(
         CurveTween(curve: dismissIncomingCurve), dismissIncomingDuration);
   }
 
+  /// See [AnimatedListAnimator.resizing].
   @override
   AnimatedListAnimationData resizing(double fromSize, double toSize) {
     return AnimatedListAnimationData(
         CurveTween(curve: resizeCurve), resizeDuration);
   }
 
+  /// See [AnimatedListAnimator.resizingDuringReordering].
   @override
   AnimatedListAnimationData resizingDuringReordering(
       double fromSize, double toSize) {
     return AnimatedListAnimationData(
         CurveTween(curve: reorderCurve), reorderDuration);
   }
+
+  /// See [AnimatedListAnimator.moving].
+  @override
+  AnimatedListAnimationData moving() {
+    return AnimatedListAnimationData(
+        CurveTween(curve: movingCurve), movingDuration);
+  }
 }
 
-/// Holds the info about an animation.
+/// Holds information about an animation.
 ///
-/// The [animation] attribute is used to convert the linear animation (from 0.0 to 1.0) in a customized way,
+/// The [animation] attribute is used to convert the linear animation (from `0.0` to `1.0`) in a customized way,
 /// like [Tween]s.
 ///
 /// The [duration] attribute indicates the duration of the entire animation.
 ///
-/// The [startTime] attribute, if is greater than zeor, indicates that the animation won't start from the beginning
+/// The [startTime] attribute, if is greater than zero, indicates that the animation won't start from the beginning
 /// but at a specific point.
 class AnimatedListAnimationData {
   const AnimatedListAnimationData(this.animation, this.duration,

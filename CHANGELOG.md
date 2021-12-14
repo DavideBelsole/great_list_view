@@ -35,3 +35,8 @@ Initial alpha release. Includes `AnimatedSliverList`, `AnimatedListDiffDispatche
 - Removed explicit version dependencies;
 - Code changed to work with the new stable version of flutter 2.5.3;
 - Added holdScrollOffset attribute to prevent scrolling up when the above items not visibile are modified;.
+
+## [0.1.3] - 14-12-2021
+
+- More bug fixes;
+- When you release the dragged item while reordering, an animation now occurs.

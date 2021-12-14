@@ -14,20 +14,31 @@ class AnimatedListView extends BoxScrollView {
   ///
   /// Most of the attributes are identical to those of the [ListView].
   /// The specific ones are the following:
-  /// - `listController`, an [AnimatedListController] mainly used to be notified about any changes to the underlying list;
-  /// - `itemBuilder`, an [AnimatedWidgetBuilder] used to build the widgets of the underlying list items;
-  /// - `iniitalItemCount`, the initial count of the underlying list items;
-  /// - `animator`, an [AnimatedListAnimator] used to customize all the animations;
-  /// - `addLongPressReorderable`, used to wrap each item in a [LongPressReorderable] (see also
+  /// - [listController], an [AnimatedListController] mainly used to be notified about any changes to the underlying list;
+  /// - [itemBuilder], an [AnimatedWidgetBuilder] used to build the widgets of the underlying list items;
+  /// - [initialItemCount], the initial count of the underlying list items;
+  /// - [animator], an [AnimatedListAnimator] used to customize all the animations (see also
+  ///   [AnimatedSliverChildBuilderDelegate.animator]);
+  /// - [addLongPressReorderable], used to wrap each item in a [LongPressReorderable] (see also
   ///   [AnimatedSliverChildBuilderDelegate.addLongPressReorderable]);
-  /// - `addAnimatedElevation`, used to wrap each item in a [Material] (see also
+  /// - [addAnimatedElevation], used to wrap each item in a [Material] (see also
   ///   [AnimatedSliverChildBuilderDelegate.addAnimatedElevation]);
-  /// - `addFadeTransition`, used to wrap each item in a [FadeTransition] (see also
+  /// - [addFadeTransition], used to wrap each item in a [FadeTransition] (see also
   ///   [AnimatedSliverChildBuilderDelegate.addFadeTransition]);
-  /// - `morphComparator`, used to wrap each item in a [MorphTransition] (see also [MorphTransition.comparator]);
-  /// - `resizeChangingitems`, tells wheter or not resize widgets when they are crossfading (see also
-  ///   [MorphTransition.resizeWidgets]);
-  /// - `reorderModel`, used to provide a model (a bunch of callbacks) which controls the behavior of reorders.
+  /// - [morphComparator], used to wrap each item in a [MorphTransition] (see also
+  ///   [AnimatedSliverChildBuilderDelegate.morphComparator]);
+  /// - [morphResizeWidgets], tells wheter or not resize widgets when they are crossfading (see also
+  ///   [AnimatedSliverChildBuilderDelegate.morphResizeWidgets]);
+  /// - [morphDuration], the duration of the [MorphTransition] effect (see also
+  ///   [AnimatedSliverChildBuilderDelegate.morphDuration]);
+  /// - [reorderModel], used to provide a model (a bunch of callbacks) which controls the behavior of reorders
+  ///   (see also [AnimatedSliverChildBuilderDelegate.reorderModel]);
+  /// - [initialScrollOffsetCallback], callback invoked at the first build that returns the initial scroll offset
+  ///   (see also [AnimatedSliverChildBuilderDelegate.initialScrollOffsetCallback]);
+  /// - [didFinishLayoutCallback], callback invoked when the list view has been layouted
+  ///   (see also [AnimatedSliverChildBuilderDelegate.didFinishLayoutCallback]);
+  /// - [holdScrollOffset], holds the scroll position when above items are modified (see also
+  ///   [AnimatedSliverChildBuilderDelegate.holdScrollOffset]);
   AnimatedListView({
     Key? key,
     required this.listController,
@@ -40,7 +51,7 @@ class AnimatedListView extends BoxScrollView {
     bool addFadeTransition = true,
     MorphComparator? morphComparator,
     bool morphResizeWidgets = true,
-    Duration morphDuration = const Duration(milliseconds: 500),
+    Duration morphDuration = kDefaultMorphTransitionDuration,
     AnimatedListBaseReorderModel? reorderModel,
     InitialScrollOffsetCallback? initialScrollOffsetCallback,
     void Function(int, int)? didFinishLayoutCallback,
@@ -104,8 +115,8 @@ class AnimatedListView extends BoxScrollView {
   ///
   /// Most of the attributes are identical to those of the [ListView].
   /// The specific ones are the following:
-  /// - `listController`, an [AnimatedListController] mainly used to be notified about any changes to the underlying list;
-  /// - `delegate`, your custom [AnimatedSliverChildDelegate] delegate.
+  /// - [listController], an [AnimatedListController] mainly used to be notified about any changes to the underlying list;
+  /// - [delegate], your custom [AnimatedSliverChildDelegate] delegate.
   const AnimatedListView.custom({
     Key? key,
     required this.listController,
@@ -175,7 +186,7 @@ abstract class AnimatedSliverMultiBoxAdaptorWidget
   static AnimatedSliverMultiBoxAdaptorElement? of(BuildContext context) {
     try {
       return context
-          .findAncestorRenderObjectOfType<AnimatedRenderSliverList>()
+          .findAncestorRenderObjectOfType<AnimatedRenderSliverMultiBoxAdaptor>()
           ?.childManager;
     } catch (e) {
       return null;
@@ -229,7 +240,7 @@ class AnimatedSliverFixedExtentList
   }
 }
 
-/// Extends [AnimatedListView] by offering intrisic use of the [AnimatedListDiffListDispatcher]
+/// Extension of the [AnimatedListView] that offers intrisic use of the [AnimatedListDiffListDispatcher]
 /// to automatically animate the list view when this widget is rebuilt with a different [list].
 /// All attributes, except for [list], are identical to those of the [AnimatedListView].
 class AutomaticAnimatedListView<T> extends AnimatedListView {
@@ -244,7 +255,7 @@ class AutomaticAnimatedListView<T> extends AnimatedListView {
     double addAnimatedElevation = kDefaultAnimatedElevation,
     bool addFadeTransition = true,
     bool morphResizeWidgets = true,
-    Duration morphDuration = const Duration(milliseconds: 500),
+    Duration morphDuration = kDefaultMorphTransitionDuration,
     MorphComparator? morphComparator,
     AnimatedListBaseReorderModel? reorderModel,
     InitialScrollOffsetCallback? initialScrollOffsetCallback,
@@ -327,12 +338,6 @@ class AutomaticAnimatedListView<T> extends AnimatedListView {
 }
 
 class _DiffDispatcherWidget<T> extends StatefulWidget {
-  final AnimatedListController controller;
-  final AnimatedListDiffListBuilder<T> itemBuilder;
-  final AnimatedListDiffListBaseComparator<T> comparator;
-  final List<T> list;
-  final Widget child;
-
   const _DiffDispatcherWidget(
       {Key? key,
       required this.controller,
@@ -341,6 +346,12 @@ class _DiffDispatcherWidget<T> extends StatefulWidget {
       required this.itemBuilder,
       required this.child})
       : super(key: key);
+
+  final AnimatedListController controller;
+  final AnimatedListDiffListBuilder<T> itemBuilder;
+  final AnimatedListDiffListBaseComparator<T> comparator;
+  final List<T> list;
+  final Widget child;
 
   @override
   _DiffDispatcherWidgetState<T> createState() =>
@@ -388,23 +399,37 @@ class _DiffDispatcherWidgetState<T> extends State<_DiffDispatcherWidget<T>> {
   }
 }
 
+/// Default implementation of a reorder model based on a [List].
 class AutomaticAnimatedListReorderModel<T>
     extends AnimatedListBaseReorderModel {
-  final List<T> list;
-
   const AutomaticAnimatedListReorderModel(this.list);
 
+  final List<T> list;
+
+  /// See [AnimatedListBaseReorderModel].
+  ///
+  /// The default implementation always returns `true`.
   @override
   bool onReorderStart(int index, double dx, double dy) => true;
 
+  /// See [AnimatedListBaseReorderModel].
+  ///
+  /// The default implementation always returns `null`.
   @override
   Object? onReorderFeedback(
           int index, int dropIndex, double offset, double dx, double dy) =>
       null;
 
+  /// See [AnimatedListBaseReorderModel].
+  ///
+  /// The default implementation always returns `true`.
   @override
   bool onReorderMove(int index, int dropIndex) => true;
 
+  /// See [AnimatedListBaseReorderModel].
+  ///
+  /// The default implementation always returns `true`, after removing the dragged item
+  /// and reinserted it in the new position.
   @override
   bool onReorderComplete(int index, int dropIndex, Object? slot) {
     list.insert(dropIndex, list.removeAt(index));

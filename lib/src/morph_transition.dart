@@ -12,7 +12,7 @@ import 'ticker_mixin.dart';
 typedef MorphComparator = bool Function(Widget a, Widget b);
 
 /// This widget every time it is rebuilt creates a crossfade effect by making the old [child] widget
-/// disappear and making the new one appear.
+/// disappear and the new one appear.
 ///
 /// If the instance of the [child] widget doesn't change, the crossfade effect doesn't occur.
 /// If the new [child] widget has a different instance, the [comparator] is used to determine if
@@ -25,7 +25,7 @@ typedef MorphComparator = bool Function(Widget a, Widget b);
 /// If it is `false`, both children keep their size during animation, inevitably causing cropping of the
 /// biggest child (but only if their dimensions are obviously different).
 class MorphTransition extends RenderObjectWidget {
-  MorphTransition({
+  const MorphTransition({
     Key? key,
     required this.child,
     required this.comparator,
@@ -465,7 +465,6 @@ class _MorphRenderObjectElement extends RenderObjectElement
   @override
   void unmount() {
     super.unmount();
-    // renderObject.dispose();
     dispose();
   }
 }

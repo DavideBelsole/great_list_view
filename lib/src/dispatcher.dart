@@ -8,38 +8,34 @@ import 'package:worker_manager/worker_manager.dart';
 
 import 'core/core.dart';
 
-const int _kSpawnNewIsolateCount = 500;
+const int kSpawnNewIsolateCount = 500;
 
 typedef AnimatedListDiffBuilder<T> = Widget Function(
     BuildContext context, T list, int index, AnimatedWidgetBuilderData data);
 
 /// A derivated version of this class has to be implemented to tell [AnimatedListDiffDispatcher]
-/// how compare items of two lists in order to dispatch to the [AnimatedListController]
-/// the differences.
+/// how to compare items of two lists in order to dispatch the differences
+/// to the [AnimatedListController].
 abstract class AnimatedListDiffBaseComparator<T> {
   const AnimatedListDiffBaseComparator();
 
-  /// Compares the [indexA] of the [listA] with the [indexB] of the [listB] and returns
+  /// It compares the [indexA] of the [listA] with the [indexB] of the [listB] and returns
   /// `true` is they are the same item. Usually, the "id" of the item is compared here.
   bool sameItem(T listA, int indexA, T listB, int indexB);
 
-  /// Compares the [indexA] of [listA] with the [indexB] of [listB] and returns
+  /// IT compares the [indexA] of [listA] with the [indexB] of [listB] and returns
   /// `true` is they have the same content. This method is called after [sameItem]
-  /// returned `true`, so this method tells if the same item has changed in its content,
-  /// if so a changing notification will be sent to the controller.
+  /// returned `true`, so this method tells if the same item has changed its content;
+  /// if so a changing notification will be sent to the [AnimatedListController].
   bool sameContent(T listA, int indexA, T listB, int indexB);
 
-  /// Returns the length of the [list].
+  /// It returns the length of the [list].
   int lengthOf(T list);
 }
 
-/// A callbacked version of [AnimatedListDiffBaseComparator], useful if you don't like
-/// to create new derivated class apart.
+/// A callback function-based version of [AnimatedListDiffBaseComparator], useful if
+/// you are bored of creating a new derivated class.
 class AnimatedListDiffComparator<T> extends AnimatedListDiffBaseComparator<T> {
-  final bool Function(T listA, int indexA, T listB, int indexB) _sameItem;
-  final bool Function(T listA, int indexA, T listB, int indexB) _sameContent;
-  final int Function(T list) _lengthOf;
-
   const AnimatedListDiffComparator({
     required bool Function(T listA, int indexA, T listB, int indexB) sameItem,
     required bool Function(T listA, int indexA, T listB, int indexB)
@@ -48,6 +44,10 @@ class AnimatedListDiffComparator<T> extends AnimatedListDiffBaseComparator<T> {
   })  : _sameItem = sameItem,
         _sameContent = sameContent,
         _lengthOf = lengthOf;
+
+  final bool Function(T listA, int indexA, T listB, int indexB) _sameItem;
+  final bool Function(T listA, int indexA, T listB, int indexB) _sameContent;
+  final int Function(T list) _lengthOf;
 
   @override
   bool sameItem(T listA, int indexA, T listB, int indexB) =>
@@ -72,6 +72,14 @@ class AnimatedListDiffComparator<T> extends AnimatedListDiffBaseComparator<T> {
 /// and [AnimatedListController.notifyRemovedRange] methods).
 /// The two lists are compared using the [comparator] provided.
 class AnimatedListDiffDispatcher<T> {
+  AnimatedListDiffDispatcher(
+      {required T initialList,
+      required this.controller,
+      required this.builder,
+      required this.comparator,
+      this.spawnNewInsolateCount = kSpawnNewIsolateCount})
+      : _currentList = initialList;
+
   final AnimatedListController controller;
   final AnimatedListDiffBuilder<T> builder;
   final AnimatedListDiffBaseComparator<T> comparator;
@@ -81,16 +89,8 @@ class AnimatedListDiffDispatcher<T> {
   T? _oldList, _processingList;
   Cancelable<_DiffResultDispatcher>? _cancelable;
 
-  AnimatedListDiffDispatcher(
-      {required T initialList,
-      required this.controller,
-      required this.builder,
-      required this.comparator,
-      this.spawnNewInsolateCount = _kSpawnNewIsolateCount})
-      : _currentList = initialList;
-
-  /// Replaces the current list with the new one. Differences are calculated and then dispatched
-  /// to the coontroller.
+  /// It replaces the current list with the new one.
+  /// Differences are calculated and then dispatched to the [coontroller].
   Future<void> dispatchNewList(final T newList) async {
     _processingList = newList;
 
@@ -139,12 +139,10 @@ class AnimatedListDiffDispatcher<T> {
     });
   }
 
-  // void onBeforeDispatch(_DiffResultDispatcher dr, T oldList, T newList) {}
-
-  /// Returns `true` if the Meyes algorithm is still running.
+  /// It returns `true` if the Meyes algorithm is still running.
   bool get hasPendingTask => _processingList != null;
 
-  /// Returns the current list that is using the [AnimatedSliverList].
+  /// It returns the current underlying list.
   /// This corresponds to the last list passed to the [dispatchNewList] method if only the
   /// Meyes algorithm is not yet running.
   T get currentList => _currentList;
@@ -172,7 +170,7 @@ class AnimatedListDiffDispatcher<T> {
     }
   }
 
-  /// Stops this dispatcher from processing the Meyes algorithm and returns
+  /// It stops this dispatcher from processing the Meyes algorithm and returns
   /// the list is currently being processed, if any.
   T? discard() {
     final list = _processingList;
@@ -202,7 +200,7 @@ class _DiffDelegate<T> implements DiffDelegate {
   final bool Function(T, int, T, int) _areItemsTheSame;
   final int Function(T) _listLength;
 
-  _DiffDelegate(this.oldList, this.newList, this._areContentsTheSame,
+  const _DiffDelegate(this.oldList, this.newList, this._areContentsTheSame,
       this._areItemsTheSame, this._listLength);
 
   @override
@@ -237,24 +235,15 @@ enum _OperationType {
 }
 
 class _Operation {
-  final _OperationType type;
-  final int position, count1;
-  final int? count2;
-
-  _Operation(
+  const _Operation(
       {required this.type,
       required this.position,
       required this.count1,
       this.count2});
 
-  @override
-  String toString() {
-    if (type == _OperationType.REPLACE) {
-      return '$typeToString $position ($count1,$count2)';
-    } else {
-      return '$typeToString $position ($count1)';
-    }
-  }
+  final _OperationType type;
+  final int position, count1;
+  final int? count2;
 
   String get typeToString {
     switch (type) {
@@ -268,13 +257,18 @@ class _Operation {
         return 'CHG';
     }
   }
+
+  @override
+  String toString() {
+    if (type == _OperationType.REPLACE) {
+      return '$typeToString $position ($count1,$count2)';
+    } else {
+      return '$typeToString $position ($count1)';
+    }
+  }
 }
 
 class _DiffResultDispatcher {
-  int? _removedPosition, _changedPosition;
-  int _removedCount = 0, _changedCount = 0;
-  final List<_Operation> _list = [];
-
   _DiffResultDispatcher(final DiffResult diffResult) {
     var upd = diffResult.getUpdates(batch: false);
     for (final u in upd) {
@@ -311,7 +305,7 @@ class _DiffResultDispatcher {
           _removedCount = count;
         },
         move: (from, to) {
-          throw 'operation noy supported yet!';
+          throw Exception('operation not supported yet!');
         },
       );
     }
@@ -319,8 +313,9 @@ class _DiffResultDispatcher {
     _pushPendings();
   }
 
-  @override
-  String toString() => _list.toString();
+  final List<_Operation> _list = [];
+  int? _removedPosition, _changedPosition;
+  int _removedCount = 0, _changedCount = 0;
 
   void _pushPendings() {
     if (_removedPosition != null) {
@@ -361,6 +356,9 @@ class _DiffResultDispatcher {
       }
     }
   }
+
+  @override
+  String toString() => _list.toString();
 }
 
 //
@@ -368,28 +366,36 @@ class _DiffResultDispatcher {
 typedef AnimatedListDiffListBuilder<T> = Widget Function(
     BuildContext context, T element, AnimatedWidgetBuilderData data);
 
-/// A simplified [List] version of [AnimatedListDiffBaseComparator].
+/// This class extends [AnimatedListDiffListBaseComparator] in order to handle easier
+/// the simplified version with [List]s objects.
 abstract class AnimatedListDiffListBaseComparator<T> {
   const AnimatedListDiffListBaseComparator();
+
   bool sameItem(T elementA, T elementB);
   bool sameContent(T elementA, T elementB);
 }
 
-/// A callbacked version of [AnimatedListDiffListBaseComparator].
+/// A callback function-based version of [AnimatedListDiffListBaseComparator].
 class AnimatedListDiffListComparator<T>
     extends AnimatedListDiffListBaseComparator<T> {
-  final bool Function(T elementA, T elementB) _sameItem;
-  final bool Function(T elementA, T elementB) _sameContent;
-
   const AnimatedListDiffListComparator({
     required bool Function(T elementA, T elementB) sameItem,
     required bool Function(T elementA, T elementB) sameContent,
   })  : _sameItem = sameItem,
         _sameContent = sameContent;
 
+  final bool Function(T elementA, T elementB) _sameItem;
+  final bool Function(T elementA, T elementB) _sameContent;
+
+  /// It compares the [elementA] with the [elementB] and returns
+  /// `true` is they are the same item. Usually, the "id" of the item is compared here.
   @override
   bool sameItem(T elementA, T elementB) => _sameItem(elementA, elementB);
 
+  /// IT compares the [elementA] with the [elementB] and returns
+  /// `true` is they have the same content. This method is called after [sameItem]
+  /// returned `true`, so this method tells if the same item has changed its content;
+  /// if so a changing notification will be sent to the [AnimatedListController].
   @override
   bool sameContent(T elementA, T elementB) => _sameContent(elementA, elementB);
 }
@@ -403,7 +409,7 @@ class AnimatedListDiffListDispatcher<T>
       required AnimatedListDiffListBuilder<T> itemBuilder,
       required List<T> currentList,
       required AnimatedListDiffListBaseComparator<T> comparator,
-      int spawnNewInsolateCount = _kSpawnNewIsolateCount})
+      int spawnNewInsolateCount = kSpawnNewIsolateCount})
       : super(
           controller: controller,
           initialList: currentList,
@@ -416,9 +422,9 @@ class AnimatedListDiffListDispatcher<T>
 }
 
 class _ListDiffComparator<T> extends AnimatedListDiffBaseComparator<List<T>> {
-  final AnimatedListDiffListBaseComparator<T> comparator;
-
   _ListDiffComparator(this.comparator);
+
+  final AnimatedListDiffListBaseComparator<T> comparator;
 
   @override
   bool sameItem(List<T> listA, int indexA, List<T> listB, int indexB) =>

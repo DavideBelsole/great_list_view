@@ -8,6 +8,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../delegates.dart';
 import '../ticker_mixin.dart';
@@ -22,14 +23,14 @@ part 'sliver_list.dart';
 
 /// Additional information to build a specific item of the list.
 class AnimatedWidgetBuilderData {
-  /// The main animation used by dismssing of incoming items. The value 0.0 indicates that the
-  /// item is totally dismissed, whereas 1.0 indicates the item is totally income.
+  /// The main animation used by dismssing of incoming items. The value `0.0` indicates that the
+  /// item is totally dismissed, whereas `1.0` indicates the item is totally income.
   final Animation<double> animation;
 
-  /// If true it indicates that this item is the one dragged during a reorder.
+  /// If `true` it indicates that this item is the one dragged during a reorder.
   final bool dragging;
 
-  /// If true it indicates that this item is going to be built just to measure it. You can check
+  /// If `true` it indicates that this item is going to be built just to measure it. You can check
   /// this attribute in order to build am equivalent lighter widget (which is the same size as
   /// the original).
   final bool measuring;
@@ -37,7 +38,7 @@ class AnimatedWidgetBuilderData {
   /// The slot value you have returned from your [AnimatedListBaseReorderModel].
   final Object? slot;
 
-  AnimatedWidgetBuilderData(this.animation,
+  const AnimatedWidgetBuilderData(this.animation,
       {this.measuring = false, this.dragging = false, this.slot});
 }
 
@@ -73,6 +74,7 @@ abstract class AnimatedListBaseReorderModel {
   bool onReorderComplete(int index, int dropIndex, Object? slot) => false;
 }
 
+/// A callback function-based version of [AnimatedListBaseReorderModel].
 class AnimatedListReorderModel extends AnimatedListBaseReorderModel {
   const AnimatedListReorderModel({
     bool Function(int index, double dx, double dy)? onReorderStart,
@@ -112,6 +114,21 @@ class AnimatedListReorderModel extends AnimatedListBaseReorderModel {
       _onReorderComplete?.call(index, dropIndex, slot) ?? false;
 }
 
+typedef InitialScrollOffsetCallback = double? Function(
+    SliverConstraints constraints);
+
+/// The part of the size of the item that is currently visible.
+class PercentageSize {
+  final double size, referredSize;
+
+  PercentageSize(this.size, this.referredSize);
+
+  double get percentage => size / referredSize;
+
+  @override
+  String toString() => '${percentage * 100.0}%';
+}
+
 class _Measure {
   final double value;
   final bool estimated;
@@ -131,57 +148,52 @@ extension _MeasureExtension on double {
   _Measure toExactMeasure() => this == 0.0 ? _Measure.zero : _Measure(this);
 }
 
-typedef InitialScrollOffsetCallback = double? Function(
-    SliverConstraints constraints);
+class _UpdateFlags {
+  const _UpdateFlags([int flags = 0])
+      : _value = flags,
+        assert((flags &
+                ~(CLEAR_LAYOUT_OFFSET |
+                    KEEP_FIRST_LAYOUT_OFFSET |
+                    POPUP_PICK |
+                    POPUP_DROP |
+                    DISCARD_ELEMENT)) ==
+            0),
+        assert((flags & (CLEAR_LAYOUT_OFFSET | KEEP_FIRST_LAYOUT_OFFSET)) !=
+            KEEP_FIRST_LAYOUT_OFFSET),
+        assert(
+            (flags & (POPUP_PICK | POPUP_DROP)) != (POPUP_PICK | POPUP_DROP));
 
-class PercentageSize {
-  final double size, referredSize;
+  final int _value;
 
-  PercentageSize(this.size, this.referredSize);
-
-  double get percentage => size / referredSize;
-
-  @override
-  String toString() => '${percentage * 100.0}%';
-}
-
-typedef _UpdateFlags = int;
-
-extension _UpdateFlagsEx on _UpdateFlags {
-  // static const int UNBIND_NONE = 0;
   static const int CLEAR_LAYOUT_OFFSET = 1 << 0;
   static const int KEEP_FIRST_LAYOUT_OFFSET = 1 << 1;
-  static const int REORDER_PICK = 1 << 2;
-  static const int REORDER_DROP = 1 << 3;
-  static const int DISCARD_ELEMENT = 1 << 4;
+  static const int DISCARD_ELEMENT = 1 << 2;
+  static const int POPUP_PICK = 1 << 3;
+  static const int POPUP_DROP = 1 << 4;
+
+  int get value => _value;
 
   bool get hasClearLayoutOffset =>
-      (this & CLEAR_LAYOUT_OFFSET) == CLEAR_LAYOUT_OFFSET;
+      (_value & CLEAR_LAYOUT_OFFSET) == CLEAR_LAYOUT_OFFSET;
   bool get hasKeepFirstLayoutOffset =>
-      (this & KEEP_FIRST_LAYOUT_OFFSET) == KEEP_FIRST_LAYOUT_OFFSET;
-  bool get hasReorderPick => (this & REORDER_PICK) == REORDER_PICK;
-  bool get hasReorderDrop => (this & REORDER_DROP) == REORDER_DROP;
-  bool get hasDiscardElement => (this & DISCARD_ELEMENT) == DISCARD_ELEMENT;
+      (_value & KEEP_FIRST_LAYOUT_OFFSET) == KEEP_FIRST_LAYOUT_OFFSET;
+  bool get hasDiscardElement => (_value & DISCARD_ELEMENT) == DISCARD_ELEMENT;
+  bool get hasPopupPick => (_value & POPUP_PICK) == POPUP_PICK;
+  bool get hasPopupDrop => (_value & POPUP_DROP) == POPUP_DROP;
 
-  bool checkIntegrity() {
-    assert((this &
-            ~(CLEAR_LAYOUT_OFFSET |
-                KEEP_FIRST_LAYOUT_OFFSET |
-                REORDER_PICK |
-                REORDER_DROP |
-                DISCARD_ELEMENT)) ==
-        0);
-    assert((this & (CLEAR_LAYOUT_OFFSET | KEEP_FIRST_LAYOUT_OFFSET)) !=
-        KEEP_FIRST_LAYOUT_OFFSET);
-    assert((this & (REORDER_PICK | REORDER_DROP)) !=
-        (REORDER_PICK | REORDER_DROP));
-    return true;
-  }
+  @override
+  String toString() => [
+        if (hasClearLayoutOffset) 'CLEAR_LAYOUT_OFFSET',
+        if (hasKeepFirstLayoutOffset) 'KEEP_FIRST_LAYOUT_OFFSET',
+        if (hasDiscardElement) 'DISCARD_ELEMENT',
+        if (hasPopupPick) 'POPUP_PICK',
+        if (hasPopupDrop) 'POPUP_DROP'
+      ].join(', ');
 }
 
 class _Update {
   const _Update(this.index, this.oldBuildCount, this.newBuildCount,
-      [this.flags = 0, this.popUpList])
+      [this.flags = const _UpdateFlags(), this.popUpList])
       : assert(index >= 0 && oldBuildCount >= 0 && newBuildCount >= 0);
 
   final int index;
@@ -193,7 +205,23 @@ class _Update {
 
   @override
   String toString() =>
-      'U(i: $index, ob: $oldBuildCount, nb: $newBuildCount, s: $skipCount, m: $flags)';
+      'U(i: $index, ob: $oldBuildCount, nb: $newBuildCount, s: $skipCount, m: $flags, pl: $popUpList)';
+}
+
+abstract class _PopUpList {
+  _PopUpList() : updates = List<_Update>.empty(growable: true);
+
+  final List<_Update> updates;
+
+  _PopUpInterval? interval;
+
+  Iterable<Element> get elements;
+
+  void clearElements();
+
+  @override
+  String toString() =>
+      '(updates: $updates, interval: $interval, elements: $elements)';
 }
 
 typedef _IntervalBuilder = Widget Function(BuildContext context, int buildIndex,

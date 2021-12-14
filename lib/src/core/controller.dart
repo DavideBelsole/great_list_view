@@ -69,6 +69,8 @@ class AnimatedListController {
   /// [AnimatedSliverChildBuilderDelegate.addLongPressReorderable] attribute or the
   /// [LongPressReorderable] widget (for example if you want to reorder using your
   /// custom drag handles).
+  ///
+  /// This method could return `false` indicating that the reordering cannot be started.
   bool notifyStartReorder(BuildContext context, double dx, double dy) {
     assert(_debugAssertBinded());
     return _interface!.notifyStartReorder(context, dx, dy);
@@ -87,7 +89,8 @@ class AnimatedListController {
     _interface!.notifyUpdateReorder(dx, dy);
   }
 
-  /// Notifies the [AnimatedListView] that the reorder has finished or cancelled.
+  /// Notifies the [AnimatedListView] that the reorder has finished or cancelled
+  /// ([cancel] set to `true`).
   ///
   /// Use this method only if you have decided not to use the
   /// [AnimatedSliverChildBuilderDelegate.addLongPressReorderable] attribute or the
@@ -124,7 +127,7 @@ class AnimatedListController {
   ///
   /// The index of the item refers to the index of the underlying list.
   ///
-  /// The method returns `null` if the box of the item cannot be calculated. This happens when the item 
+  /// The method returns `null` if the box of the item cannot be calculated. This happens when the item
   /// isn't yet diplayed or when the state of the list view has been changed via notifications
   /// but these changes are not yet taken into account.
   PercentageSize? getItemVisibleSize(int index) {

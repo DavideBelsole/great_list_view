@@ -98,6 +98,11 @@ class _ControlledAnimation extends _Animation with ChangeNotifier {
     _controller.stop();
   }
 
+  void reset() {
+    assert(_debugAssertNotDisposed());
+    _controller.value = 0.0;
+  }
+
   void complete() {
     assert(_debugAssertNotDisposed());
     _controller.value = 1.0;

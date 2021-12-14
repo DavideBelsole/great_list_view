@@ -9,10 +9,10 @@ Compared to the `AnimatedList`, `ReorderableListView` material widgets or other 
 
 - it can be both animated and reordered at the same time;
 - it works without necessarily specifying a `List` object, but simply using index-based `builder` callbacks;
-- all changes to list view items are gathered and grouped into intervals, so for examaple you can remove a whole interval of a thousand items with a single remove change;
+- all changes to list view items are gathered and grouped into intervals, so for examaple you can remove a whole interval of a thousand items with a single remove change without losing in performance;
 - it is not mandatory to provide a key for each item, because everything works using only indexes;
 - it also works well even with a very long list;
-- the library extends `SliverWithKeepAliveWidget` and `RenderObjectElement` classes, no `Stack`, `Offstage` or `Overlay` widgets or similiar are used;
+- the library extends `SliverWithKeepAliveWidget` and `RenderObjectElement` classes, no `Stack`, `Offstage` or `Overlay` widgets or similiar are used.
 
 ![Example 1](https://drive.google.com/uc?id=1y2jnZ2k0eAfu9KYtH6JG8d5Aj8bwTONL)
 
@@ -24,10 +24,9 @@ This package also provides a tree adapter to create a tree view without defining
 This is still an alpha version! This library is constantly evolving and bug fixing, so it may change very often at the moment, sorry.
 
 This library lacks of a bunch of features I'm working on in my free time:
-- When you drop the dragged item during reordering, there is no animation yet;
 - When two items swap their positions, no motion animation occurs, but one of the items is removed and reinserted again;
 - Lack of a feature to create a separated list view (like ListView.separated construtor);
-- When a range of items is removed above the displayed items, the latter scroll up.
+- No semantics are currently supported.
 </b>
 
 ## Installing
@@ -36,7 +35,7 @@ Add this to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  great_list_view: ^0.1.2
+  great_list_view: ^0.1.3
 ```
 
 and run;
@@ -49,10 +48,10 @@ flutter packages get
 
 The simplest way to create an animated list view that automatically animates to fit the contents of a `List` is to use the `AutomaticAnimatedListView` widget.
 A list of data must be passed to the widget via the `list` attribute.
-This widget uses an `AnimatedListDiffListDispatcher` internally. This claase uses the Meyes algorithm that dispatches the differences to the list view after comparing the new `list` object with the old one.
+This widget uses an `AnimatedListDiffListDispatcher` internally. This class uses the Meyes algorithm that dispatches the differences to the list view after comparing the new `list` object with the old one.
 In this regard, it is necessary to pass to the `comparator` attribute an `AnimatedListDiffListBaseComparator` object which takes care of comparing an element of the old list with an element of the new list via two methods:
-- `sameItem` must return true if the two compared elements are the same element (if the elements have their own ID, just check the two IDs are equal);
-- `sameContent` is called only if `sameItem` has returned true, and must return true if the item has changed in content (if false is returned, this dispatches a change notification to the list view);
+- `sameItem` must return `true` if the two compared elements are the same element (if the elements have their own ID, just check the two IDs are equal);
+- `sameContent` is called only if `sameItem` has returned `true`, and must return true if the item has changed in content (if `false` is returned, this dispatches a change notification to the list view).
 You can also use the callback function-based `AnimatedListDiffListComparator` version, saving you from creating a new derived class.
 
 The list view needs an `AnimatedListController` object to be controlled. Just instantiate it and pass it to the `listController` attribute of the `AutomaticAnimatedListView` widget.
@@ -70,7 +69,7 @@ The most important attributes of the `AnimatedWidgetBuilderData` object to consi
 Unless you want to customize these animations, you can ignore this attribute.
 
 By default, all animations are automatically wrapped around the item built by the `itemBuilder`, with the exception of animation which deals with modifying the content of a item, which must be implicit to the widget itself.
-For example, if the content of the item affects its size, margins or color, simply wrap the item in an `AnimatedContainer`: this widget will take care of implicitly animating the item when one of the above attributes changes value.
+For example, if the content of the item reflects its size, margins or color, simply wrap the item in an `AnimatedContainer`: this widget will take care of implicitly animating the item when one of the above attributes changes value.
 
 The `itemExtent` attribute can be used to set a fixed extent for all items.
 
@@ -204,8 +203,8 @@ final gkey = GlobalKey<_BodyState>();
 ```
 
 However, if the changing content cannot be implicitly animated using implicit animations, such as animating a text that is changing, I suggest using `MorphTransition`, which provides a cross-fade effect between the old widget and the new one.
-The `MorphTransition` widget uses a delegate to pass to the `comparator` attribute which takes care of comparing the old widget with the new one. This delegate has to return false if the two widgets are different, in order to trigger the cross-fade effect. 
-This comparator needs to be well implemented, because returning false even when not necessary will lead to a drop in performance as this effect would also be applied to two completely identical widgets, thus wasting precious resources to perform an animation that is not actually necessary and that is not even perceptible to the human eye.
+The `MorphTransition` widget uses a delegate to pass to the `comparator` attribute which takes care of comparing the old widget with the new one. This delegate has to return `false` if the two widgets are different, in order to trigger the cross-fade effect. 
+This comparator needs to be well implemented, because returning `false` even when not necessary will lead to a drop in performance as this effect would also be applied to two completely identical widgets, thus wasting precious resources to perform an animation that is not actually necessary and that is not even perceptible to the human eye.
 
 More simply, if you pass the delegate directly to the `morphComparator` attribute of the `AutomaticAnimatedListView` widget, all items will automatically be wrapped with a `MorphTransition` widget.
 
@@ -366,7 +365,7 @@ final gkey = GlobalKey<_BodyState>();
 
 ## Animated List View
 
-If you want to have more control over the list view, or if the yuor data is not just items of a `List` object, I suggest using the more flexible `AnimatedListView` widget.
+If you want to have more control over the list view, or if the your data is not just items of a `List` object, I suggest using the more flexible `AnimatedListView` widget.
 
 Unlike the `AutomaticAnimatedListView` widget, the `AnimatedListView` does not use the Meyes algorithm internally, so all change notifications have to be manually notified to the list view.
 
@@ -674,7 +673,7 @@ The `AnimatedSliverList` only needs two parameters, the usual `listController` a
 
 The `AutomaticAnimatedListView` and `AnimatedListView` widgets automatically use these slivers internally with the help of a default delegate implementation offered by the `AnimatedSliverChildBuilderDelegate` class.
 
-The `AnimatedSliverChildBuilderDelegate` delegate is more than enough to cover most needs, however, if you need more control, you can always create a new one by extending the` AnimatedSliverChildDelegate` class. However, I don't recommend extending this class directly unless strictly necessary.
+The `AnimatedSliverChildBuilderDelegate` delegate is more than enough to cover most needs, however, if you need more control, you can always create a new one by extending the `AnimatedSliverChildDelegate` class. However, I don't recommend extending this class directly unless strictly necessary.
 
 ### Example 5 (Animated Sliver List)
 
@@ -835,7 +834,7 @@ final gkey = GlobalKey<_BodyState>();
 ## Reordering
 
 The list view can also be reordered on demand, even while it is animating.
-You can enable the automatic reordering feature, which is activated by long pressing on the item you want to reorder, setting the `addLongPressReorderable` attribute to true (this attribute is in the `AutomaticAnimatedListView`, `AnimatedListView` and` AnimatedSliverChildBuilderDelegate` classes).
+You can enable the automatic reordering feature, which is activated by long pressing on the item you want to reorder, setting the `addLongPressReorderable` attribute to `true` (this attribute can be found in the `AutomaticAnimatedListView`, `AnimatedListView` and` AnimatedSliverChildBuilderDelegate` classes).
 
 In addition you have to pass a model to the `reorderModel` attribute by extending the `AnimatedListBaseReorderModel` class.
 You can also use the callback function-based `AnimatedListReorderModel` version, saving you from creating a new derived class.
@@ -974,11 +973,15 @@ final gkey = GlobalKey<_BodyState>();
 ```
 
 If you need more control, or if you are not using the `AutomaticAnimatedListView` widget, you will need to implement the reorder model manually.
+
 The model requires the implementation of four methods.
-In order to enable reordering of all items, simply have the `onReorderStart` callback return true. The function is called with the index of the item to be dragged for reordering, and the coordinates of the exact point touched. The function must return a flag indicating whether the item can be dragged/reordered or not.
-To allow the dragged item to be swapped with its current underlying item, simply have the `onReorderMove` callback return true. The function is called with the index of the item being dragged and the index of the item with which to swap positions. The function must return a flag indicating whether or not the item can be interchanged with the other.
-Finally you have to implement the `onReorderComplete` function to swap the two items. As with the `onReorderMove` method, the function is called by passing it the indices of the two items, and must return true to confirm the swap. If the function returns false, the swap will fail, and the dragged item will return to its original position.
-The `onReorderComplete` function is also responsible for actually swapping the two items in the underlying data list when it returns true.
+
+In order to enable reordering of all items, simply have the `onReorderStart` callback return `true`. The function is called with the index of the item to be dragged for reordering, and the coordinates of the exact point touched. The function must return a flag indicating whether the item can be dragged/reordered or not.
+
+To allow the dragged item to be dropped in the new moved position, simply have the `onReorderMove` callback return `true`. The function is called with the index of the item being dragged and the index that the item would assume. The function must return a flag indicating whether or not the item can be moved in that new position.
+
+Finally you have to implement the `onReorderComplete` function to actually move the dragged item. As the `onReorderMove` method, the function is called by passing it the two indices, and must return `true` to confirm the swap. If the function returns `false`, the swap will fail, and the dragged item will return to its original position.
+The `onReorderComplete` function is also responsible for actually swapping the two items in the underlying data list when it returns `true`.
 
 For more details about the model read the documentation of the `AnimatedListBaseReorderModel` class.
 
@@ -1311,12 +1314,12 @@ The class internally uses a window that shows only a part of the tree properly c
 
 In order to perform this conversion, the adapter needs a model that describes the tree.
 The model is nothing more than a bunch of callback functions that you have to implement. These are:
-- [parentOf] returns the parent of a node;
-- [childrenCount] returns the count of the children belonging to a node;
-- [childAt] returns the child node of a parent node at a specific position;
-- [isNodeExpanded] returns true if the node is expanded, false if it is collapsed;
-- [indexOfChild] returns the position of a child node with respect to the parent node;
-- [equals] returns true if two nodes are equal.
+- `parentOf` returns the parent of a node;
+- `childrenCount` returns the count of the children belonging to a node;
+- `childAt` returns the child node of a parent node at a specific position;
+- `isNodeExpanded` returns `true` if the node is expanded, `false` if it is collapsed;
+- `indexOfChild` returns the position of a child node with respect to the parent node;
+- `equals` returns `true` if two nodes are equal.
 
 To notify when a particular node is expanded or collapsed, the `notifyNodeExpanding` and `notifyNodeCollapsing` methods must be called respectively. It will be necessary to pass the involved node and a callback function that updates the status of the node (expanded / collapsed).
 
@@ -1583,7 +1586,7 @@ final controller = AnimatedListController();
 
 The `AnimatedListController` object provides other useful methods for obtaining information about the placement of items.
 
-Another useful method is `computeItemBox` which allows you to retrieve the box position of an item. This method is often used in conjunction with the `jumpTo` and` animateTo` methods of a `ScrollController` to scroll to a certain item.
+Another useful method is `computeItemBox` which allows you to retrieve the box (position and size) of an item. This method is often used in conjunction with the `jumpTo` and` animateTo` methods of a `ScrollController` to scroll to a certain item.
 
 It is also possible to position at a certain scroll offset when the list view is built for the first time using
 the `initialScrollOffsetCallback` attribute of the `AnimatedSliverChildDelegate`, `AnimatedListView` and `AutomaticAnimatedListView` classes; a callback function has to be passed that is invoked at the first layout of the list view, and it has to return the offset to be positioned at the beginning.
