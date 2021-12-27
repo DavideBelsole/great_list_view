@@ -14,11 +14,11 @@ Compared to the `AnimatedList`, `ReorderableListView` material widgets or other 
 - it also works well even with a very long list;
 - the library extends `SliverWithKeepAliveWidget` and `RenderObjectElement` classes, no `Stack`, `Offstage` or `Overlay` widgets or similiar are used.
 
-![Example 1](https://github.com/DavideBelsole/great_list_view/images/example1.gif)
+![Example 1](https://github.com/DavideBelsole/great_list_view/blob/master/images/example1.gif)
 
 This package also provides a tree adapter to create a tree view without defining a new widget for it, but simply by converting your tree data into a linear list view, animated or not. Your tree data can be any data type, just describe it using a model based on a bunch of callbacks.
 
-![Example 2](https://github.com/DavideBelsole/great_list_view/images/example2.gif)
+![Example 2](https://github.com/DavideBelsole/great_list_view/blob/master/images/example2.gif)
 
 <b>IMPORTANT!!!
 This is still an alpha version! This library is constantly evolving and bug fixing, so it may change very often at the moment, sorry.
