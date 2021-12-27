@@ -153,10 +153,8 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
                 popUpList.element, _build(0, popUpList: popUpList), null);
           }
         }
-        if (popUpList.interval == null) {
-          _intervalList.popUpLists.remove(popUpList);
-        }
       }
+      _intervalList.popUpLists.removeWhere((e) => e.interval == null);
 
       for (int? index in _childElements.keys.toList()) {
         Element? element = _childElements[index]!;

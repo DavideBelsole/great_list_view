@@ -40,3 +40,8 @@ Initial alpha release. Includes `AnimatedSliverList`, `AnimatedListDiffDispatche
 
 - More bug fixes;
 - When you release the dragged item while reordering, an animation now occurs.
+
+## [0.1.4] - 27.12.2021
+
+- Fixed "Concurrent modification during iteration" bug;
+- Fixed broken example images in Readme.
