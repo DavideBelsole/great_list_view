@@ -43,12 +43,12 @@ class MorphTransition extends RenderObjectWidget {
   final Clip clipBehavior;
 
   @override
-  _MorphRenderObjectElement createElement() => _MorphRenderObjectElement(this);
+  MorphRenderObjectElement createElement() => MorphRenderObjectElement(this);
 
   @override
-  _MorphRenderStack createRenderObject(BuildContext context) {
-    return _MorphRenderStack(
-      context as _MorphRenderObjectElement,
+  MorphRenderStack createRenderObject(BuildContext context) {
+    return MorphRenderStack(
+      context as MorphRenderObjectElement,
       textDirection: textDirection ?? Directionality.of(context),
       clipBehavior: clipBehavior,
       resizeChildrenWhenAnimating: resizeWidgets,
@@ -57,7 +57,7 @@ class MorphTransition extends RenderObjectWidget {
 
   @override
   void updateRenderObject(
-      BuildContext context, _MorphRenderStack renderObject) {
+      BuildContext context, MorphRenderStack renderObject) {
     renderObject
       ..textDirection = textDirection ?? Directionality.of(context)
       ..clipBehavior = clipBehavior
@@ -65,15 +65,15 @@ class MorphTransition extends RenderObjectWidget {
   }
 }
 
-class _MorphRenderStack extends RenderStack {
-  final _MorphRenderObjectElement _element;
+class MorphRenderStack extends RenderStack {
+  final MorphRenderObjectElement _element;
   final _animations = HashMap<RenderBox, AnimationController>();
   var _paintRenderObjects = HashMap<RenderBox?, int>();
   bool _resizeChildrenWhenAnimating;
   ClipRectLayer? _clipRectLayer;
   final _opacityLayer = <LayerHandle<OpacityLayer>>[];
 
-  _MorphRenderStack(
+  MorphRenderStack(
     this._element, {
     bool resizeChildrenWhenAnimating = false,
     TextDirection? textDirection,
@@ -343,22 +343,22 @@ class _MorphRenderStack extends RenderStack {
   }
 }
 
-class _MorphRenderObjectElement extends RenderObjectElement
+class MorphRenderObjectElement extends RenderObjectElement
     with TickerProviderMixin {
-  final _list = LinkedList<_Entry>();
+  final _list = LinkedList<ElementEntry>();
   Element? _topElement;
-  final _removeList = <_Entry>[];
+  final _removeList = <ElementEntry>[];
 
-  _MorphRenderObjectElement(MorphTransition widget) : super(widget);
+  MorphRenderObjectElement(MorphTransition widget) : super(widget);
 
   @override
   MorphTransition get widget => super.widget as MorphTransition;
 
   @override
-  _MorphRenderStack get renderObject => super.renderObject as _MorphRenderStack;
+  MorphRenderStack get renderObject => super.renderObject as MorphRenderStack;
 
   @override
-  void insertRenderObjectChild(RenderBox child, _Entry? slot) {
+  void insertRenderObjectChild(RenderBox child, ElementEntry? slot) {
     final renderObject = this.renderObject;
     assert(renderObject.debugValidateChild(child));
     renderObject.insert(child, after: slot?.element.renderObject as RenderBox?);
@@ -367,7 +367,7 @@ class _MorphRenderObjectElement extends RenderObjectElement
 
   @override
   void moveRenderObjectChild(
-      RenderBox child, _Entry? oldSlot, _Entry? newSlot) {
+      RenderBox child, ElementEntry? oldSlot, ElementEntry? newSlot) {
     final renderObject = this.renderObject;
     assert(child.parent == renderObject);
     renderObject.move(child,
@@ -376,7 +376,7 @@ class _MorphRenderObjectElement extends RenderObjectElement
   }
 
   @override
-  void removeRenderObjectChild(RenderBox child, _Entry? slot) {
+  void removeRenderObjectChild(RenderBox child, ElementEntry? slot) {
     final renderObject = this.renderObject;
     assert(child.parent == renderObject);
     renderObject.remove(child);
@@ -399,7 +399,7 @@ class _MorphRenderObjectElement extends RenderObjectElement
   @override
   void mount(Element? parent, Object? newSlot) {
     super.mount(parent, newSlot);
-    _list.add(_Entry(_topElement = inflateWidget(widget.child, null)));
+    _list.add(ElementEntry(_topElement = inflateWidget(widget.child, null)));
     renderObject._init();
   }
 
@@ -422,7 +422,7 @@ class _MorphRenderObjectElement extends RenderObjectElement
     late Element topElement;
     if (reusedElement == null) {
       _list.add(
-          _Entry(topElement = inflateWidget(widget.child, _list.lastOrNull)));
+          ElementEntry(topElement = inflateWidget(widget.child, _list.lastOrNull)));
     } else {
       topElement = reusedElement;
     }
@@ -469,7 +469,7 @@ class _MorphRenderObjectElement extends RenderObjectElement
   }
 }
 
-class _Entry extends LinkedListEntry<_Entry> {
+class ElementEntry extends LinkedListEntry<ElementEntry> {
   final Element element;
-  _Entry(this.element);
+  ElementEntry(this.element);
 }

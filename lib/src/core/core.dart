@@ -129,65 +129,65 @@ class PercentageSize {
   String toString() => '${percentage * 100.0}%';
 }
 
-class _Measure {
+class Measure {
   final double value;
   final bool estimated;
 
-  static _Measure get zero => const _Measure(0, false);
+  static Measure get zero => const Measure(0, false);
 
-  const _Measure(this.value, [this.estimated = false]);
+  const Measure(this.value, [this.estimated = false]);
 
-  _Measure operator +(_Measure m) =>
-      _Measure(value + m.value, estimated || m.estimated);
+  Measure operator +(Measure m) =>
+      Measure(value + m.value, estimated || m.estimated);
 
   @override
   String toString() => estimated ? '≈$value' : '$value';
 }
 
 extension _MeasureExtension on double {
-  _Measure toExactMeasure() => this == 0.0 ? _Measure.zero : _Measure(this);
+  Measure toExactMeasure() => this == 0.0 ? Measure.zero : Measure(this);
 }
 
 class _UpdateFlags {
   const _UpdateFlags([int flags = 0])
       : _value = flags,
         assert((flags &
-                ~(CLEAR_LAYOUT_OFFSET |
-                    KEEP_FIRST_LAYOUT_OFFSET |
-                    POPUP_PICK |
-                    POPUP_DROP |
-                    DISCARD_ELEMENT)) ==
+                ~(clearLayoutOffset |
+                    keepFirstLayoutOffset |
+                    popupPick |
+                    popupDrop |
+                    discardElement)) ==
             0),
-        assert((flags & (CLEAR_LAYOUT_OFFSET | KEEP_FIRST_LAYOUT_OFFSET)) !=
-            KEEP_FIRST_LAYOUT_OFFSET),
+        assert((flags & (clearLayoutOffset | keepFirstLayoutOffset)) !=
+            keepFirstLayoutOffset),
         assert(
-            (flags & (POPUP_PICK | POPUP_DROP)) != (POPUP_PICK | POPUP_DROP));
+            (flags & (popupPick | popupDrop)) != (popupPick | popupDrop));
 
   final int _value;
 
-  static const int CLEAR_LAYOUT_OFFSET = 1 << 0;
-  static const int KEEP_FIRST_LAYOUT_OFFSET = 1 << 1;
-  static const int DISCARD_ELEMENT = 1 << 2;
-  static const int POPUP_PICK = 1 << 3;
-  static const int POPUP_DROP = 1 << 4;
+  static const int clearLayoutOffset = 1 << 0;
+  static const int keepFirstLayoutOffset = 1 << 1;
+  static const int discardElement = 1 << 2;
+  static const int popupPick = 1 << 3;
+  static const int popupDrop = 1 << 4;
 
   int get value => _value;
 
   bool get hasClearLayoutOffset =>
-      (_value & CLEAR_LAYOUT_OFFSET) == CLEAR_LAYOUT_OFFSET;
+      (_value & clearLayoutOffset) == clearLayoutOffset;
   bool get hasKeepFirstLayoutOffset =>
-      (_value & KEEP_FIRST_LAYOUT_OFFSET) == KEEP_FIRST_LAYOUT_OFFSET;
-  bool get hasDiscardElement => (_value & DISCARD_ELEMENT) == DISCARD_ELEMENT;
-  bool get hasPopupPick => (_value & POPUP_PICK) == POPUP_PICK;
-  bool get hasPopupDrop => (_value & POPUP_DROP) == POPUP_DROP;
+      (_value & keepFirstLayoutOffset) == keepFirstLayoutOffset;
+  bool get hasDiscardElement => (_value & discardElement) == discardElement;
+  bool get hasPopupPick => (_value & popupPick) == popupPick;
+  bool get hasPopupDrop => (_value & popupDrop) == popupDrop;
 
   @override
   String toString() => [
-        if (hasClearLayoutOffset) 'CLEAR_LAYOUT_OFFSET',
-        if (hasKeepFirstLayoutOffset) 'KEEP_FIRST_LAYOUT_OFFSET',
-        if (hasDiscardElement) 'DISCARD_ELEMENT',
-        if (hasPopupPick) 'POPUP_PICK',
-        if (hasPopupDrop) 'POPUP_DROP'
+        if (hasClearLayoutOffset) 'clearLayoutOffset',
+        if (hasKeepFirstLayoutOffset) 'keepFirstLayoutOffset',
+        if (hasDiscardElement) 'discardElement',
+        if (hasPopupPick) 'popupPick',
+        if (hasPopupDrop) 'popupDrop'
       ].join(', ');
 }
 

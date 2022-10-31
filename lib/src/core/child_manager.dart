@@ -423,7 +423,9 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
     _childElements.values.cast<Element>().toList().forEach(visitor);
     //""""""""""""""""""""""""""""""""""""""""""""""""""""""
     for (final popUpList in _intervalList.popUpLists) {
-      popUpList.elements.forEach((e) => visitor.call(e));
+      for (final e in popUpList.elements) {
+        visitor(e);
+      }
     }
     //""""""""""""""""""""""""""""""""""""""""""""""""""""""
   }
@@ -504,11 +506,11 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   void _disposableElement(Widget widget, void Function(RenderBox) callback) {
     owner!.lockState(() {
       _currentlyUpdatingChildIndex = null;
-      var _measuringOffListChild = updateChild(null, widget, null);
-      assert(_measuringOffListChild != null);
-      callback(_measuringOffListChild!.renderObject! as RenderBox);
-      _measuringOffListChild = updateChild(_measuringOffListChild, null, null);
-      assert(_measuringOffListChild == null);
+      var measuringOffListChild = updateChild(null, widget, null);
+      assert(measuringOffListChild != null);
+      callback(measuringOffListChild!.renderObject! as RenderBox);
+      measuringOffListChild = updateChild(measuringOffListChild, null, null);
+      assert(measuringOffListChild == null);
     });
   }
 
@@ -536,7 +538,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
 
   /// Notifies that the resizing interval has changed its size by the delta amount.
   @override
-  void resizingIntervalUpdated(_AnimatedSpaceInterval interval, double delta) {
+  void resizingIntervalUpdated(AnimatedSpaceInterval interval, double delta) {
     renderObject._resizingIntervalUpdated(interval, delta);
   }
 
@@ -544,8 +546,8 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
   /// You have to provide a [builder] to build the `i`-th widget.
   /// The calculation is asynchronous and can be [cancelled].
   @override
-  Future<_Measure> measureItems(
-      _Cancelled? cancelled, int count, IndexedWidgetBuilder builder) async {
+  Future<Measure> measureItems(
+      Cancelled? cancelled, int count, IndexedWidgetBuilder builder) async {
     return await renderObject._measureItems(cancelled, count, builder);
   }
 
@@ -649,6 +651,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
       return PercentageSize(
           math.max(0.0, r2 - r1), (isHorizontal ? box.width : box.height));
     }
+    return null;
   }
 }
 

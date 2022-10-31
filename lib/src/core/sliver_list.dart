@@ -26,17 +26,17 @@ mixin AnimatedRenderSliverMultiBoxAdaptor
   }
 
   void _markSafeNeedsLayout() {
-    if (WidgetsBinding.instance?.schedulerPhase ==
+    if (WidgetsBinding.instance.schedulerPhase ==
         SchedulerPhase.persistentCallbacks) {
-      WidgetsBinding.instance?.addPostFrameCallback((_) => markNeedsLayout());
+      WidgetsBinding.instance.addPostFrameCallback((_) => markNeedsLayout());
     } else {
       markNeedsLayout();
     }
   }
 
   /// Returns the sum of the sizes of a bunch of items, built using the specified builder.
-  Future<_Measure> _measureItems(
-      _Cancelled? cancelled, int count, IndexedWidgetBuilder builder);
+  Future<Measure> _measureItems(
+      Cancelled? cancelled, int count, IndexedWidgetBuilder builder);
 
   /// Returns the size of a single widget.
   double measureItem(Widget widget, [BoxConstraints? childConstraints]);
@@ -53,7 +53,7 @@ mixin AnimatedRenderSliverMultiBoxAdaptor
   /// The specified interval has been resized by a delta amount.
   /// If this interval is above the first item layouted in the list view, this amount will be
   /// added up to a cumulative variabile.
-  void _resizingIntervalUpdated(_AnimatedSpaceInterval interval, double delta) {
+  void _resizingIntervalUpdated(AnimatedSpaceInterval interval, double delta) {
     assert(delta != 0.0);
     final firstChild = firstChildWithLayout;
     if (firstChild == null) return;
@@ -168,7 +168,7 @@ mixin AnimatedRenderSliverMultiBoxAdaptor
     if (isReordering) _reorderPerformLayout();
 
     if (fixScrollableRepainting) {
-      WidgetsBinding.instance?.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         _notifyScrollable();
       });
     }
@@ -230,7 +230,7 @@ mixin AnimatedRenderSliverMultiBoxAdaptor
     parentData.layoutOffset = layoutOffset;
   }
 
-  _Measure _estimateLayoutOffset(int buildIndex, int childCount) {
+  Measure _estimateLayoutOffset(int buildIndex, int childCount) {
     late int firstBuildIndex, lastBuildIndex;
     late double size, pos, count, trailingScrollOffset;
     if (buildIndex < indexOf(firstChild!)) {
@@ -283,7 +283,7 @@ mixin AnimatedRenderSliverMultiBoxAdaptor
       iBuildIndex += interval.buildCount;
     }
 
-    return _Measure(trailingScrollOffset + (pos * size) / count);
+    return Measure(trailingScrollOffset + (pos * size) / count);
   }
 
   //
@@ -488,7 +488,7 @@ mixin AnimatedRenderSliverMultiBoxAdaptor
   // Finally, it considers wheter to trigger a scroling of the list because
   // the dragged item has been moved the the top or bottom of it.
   void _reorderPerformLayout() {
-    WidgetsBinding.instance!.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _reorderComputeNewOffset();
     });
 
@@ -507,7 +507,7 @@ mixin AnimatedRenderSliverMultiBoxAdaptor
           constraints, controller.position, _reorderDraggedItemSize);
       if (delta != 0.0) {
         final value = position.pixels + delta;
-        WidgetsBinding.instance!.addPostFrameCallback((_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
           controller.jumpTo(value);
           markNeedsLayout();
         });
@@ -626,23 +626,23 @@ class AnimatedRenderSliverList extends RenderSliverList
   // If the calculated size exceedes the remaining cache extent of the list view,
   // an estimate will be returned.
   @override
-  Future<_Measure> _measureItems(
-      _Cancelled? cancelled, int count, IndexedWidgetBuilder builder) async {
+  Future<Measure> _measureItems(
+      Cancelled? cancelled, int count, IndexedWidgetBuilder builder) async {
     final maxSize = constraints.remainingCacheExtent;
     assert(count > 0 && maxSize >= 0.0);
     var size = 0.0;
     var i = 0;
     for (; i < count; i++) {
       if (size > maxSize) break;
-      await Future.delayed(Duration(milliseconds: 0), () {
-        if (cancelled?.value ?? false) return _Measure.zero;
+      await Future.delayed(Duration.zero, () {
+        if (cancelled?.value ?? false) return Measure.zero;
         size += measureItem(builder.call(childManager, i), childConstraints);
       });
-      if (cancelled?.value ?? false) return _Measure.zero;
+      if (cancelled?.value ?? false) return Measure.zero;
     }
     // }
     if (i < count) size *= (count / i);
-    return _Measure(size, i < count);
+    return Measure(size, i < count);
   }
 
   /// Measures the size of a single widget.
@@ -822,7 +822,7 @@ class AnimatedRenderSliverFixedExtentList extends RenderSliverFixedExtentList
       super.childManager as AnimatedSliverMultiBoxAdaptorElement;
 
   @override
-  Future<_Measure> _measureItems(_Cancelled? cancelled, int count,
+  Future<Measure> _measureItems(Cancelled? cancelled, int count,
           IndexedWidgetBuilder builder) async =>
       (itemExtent * count).toExactMeasure();
 
@@ -831,7 +831,7 @@ class AnimatedRenderSliverFixedExtentList extends RenderSliverFixedExtentList
       itemExtent;
 
   @override
-  void _resizingIntervalUpdated(_AnimatedSpaceInterval interval, double delta) {
+  void _resizingIntervalUpdated(AnimatedSpaceInterval interval, double delta) {
     super._resizingIntervalUpdated(interval, delta);
     _markSafeNeedsLayout();
   }
@@ -1156,11 +1156,11 @@ class AnimatedRenderSliverFixedExtentList extends RenderSliverFixedExtentList
       );
 
   @override
-  Rect? _computeItemBox(int buildIndex, bool absolute, bool _) {
-    if (buildIndex < 0 || buildIndex >= _intervalList.buildItemCount) {
+  Rect? _computeItemBox(int itemIndex, bool absolute, bool avoidMeasuring) {
+    if (itemIndex < 0 || itemIndex >= _intervalList.buildItemCount) {
       return null;
     }
-    var r = itemExtent * buildIndex;
+    var r = itemExtent * itemIndex;
     if (absolute) {
       r += constraints.precedingScrollExtent;
     }

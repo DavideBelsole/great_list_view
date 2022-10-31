@@ -194,7 +194,7 @@ class AnimatedSliverChildBuilderDelegate extends AnimatedSliverChildDelegate {
 
   AnimatedSliverChildBuilderDelegate(
     this.builder,
-    int initialChildCount, {
+    this.initialChildCount, {
     this.addAutomaticKeepAlives = true,
     this.addRepaintBoundaries = true,
     // this.addSemanticIndexes = true,
@@ -211,8 +211,8 @@ class AnimatedSliverChildBuilderDelegate extends AnimatedSliverChildDelegate {
     this.initialScrollOffsetCallback,
     this.didFinishLayoutCallback,
     this.holdScrollOffset = false,
-  })  : assert(initialChildCount >= 0),
-        initialChildCount = initialChildCount;
+  })
+  : assert(initialChildCount >= 0);
 
   /// See [AnimatedSliverChildDelegate.wrapWidget].
   @override

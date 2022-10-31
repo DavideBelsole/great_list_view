@@ -4,12 +4,14 @@ import 'package:worker_manager/worker_manager.dart';
 
 void main() {
   Executor().warmUp();
-  runApp(App());
+  runApp(const App());
 }
 
 class App extends StatefulWidget {
+  const App({super.key});
+
   @override
-  _AppState createState() => _AppState();
+  State<App> createState() => _AppState();
 }
 
 class _AppState extends State<App> {
@@ -25,10 +27,10 @@ class _AppState extends State<App> {
 }
 
 class Body extends StatefulWidget {
-  Body({Key? key}) : super(key: key);
+  const Body({ super.key });
 
   @override
-  _BodyState createState() => _BodyState();
+  State<Body> createState() => _BodyState();
 }
 
 class _BodyState extends State<Body> {
@@ -61,7 +63,7 @@ class _BodyState extends State<Body> {
                 a.color == b.color && a.fixedHeight == b.fixedHeight),
         itemBuilder: (context, item, data) => data.measuring
             ? Container(
-                margin: EdgeInsets.all(5), height: item.fixedHeight ?? 60)
+                margin: const EdgeInsets.all(5), height: item.fixedHeight ?? 60)
             : Item(data: item),
         listController: controller,
         addLongPressReorderable: true,
@@ -83,15 +85,15 @@ class Item extends StatelessWidget {
         child: AnimatedContainer(
             height: data.fixedHeight ?? 60,
             duration: const Duration(milliseconds: 500),
-            margin: EdgeInsets.all(5),
-            padding: EdgeInsets.all(15),
+            margin: const EdgeInsets.all(5),
+            padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
                 color: data.color,
                 border: Border.all(color: Colors.black12, width: 0)),
             child: Center(
                 child: Text(
               'Item ${data.id}',
-              style: TextStyle(fontSize: 16),
+              style: const TextStyle(fontSize: 16),
             ))));
   }
 }
@@ -103,20 +105,20 @@ class ItemData {
   const ItemData(this.id, [this.color = Colors.blue, this.fixedHeight]);
 }
 
-List<ItemData> listA = [
-  ItemData(1, Colors.orange),
-  ItemData(2),
-  ItemData(3),
-  ItemData(4),
-  ItemData(5),
-  ItemData(8, Colors.green)
+final listA = <ItemData>[
+  const ItemData(1, Colors.orange),
+  const ItemData(2),
+  const ItemData(3),
+  const ItemData(4),
+  const ItemData(5),
+  const ItemData(8, Colors.green)
 ];
-List<ItemData> listB = [
-  ItemData(2),
-  ItemData(6),
-  ItemData(5, Colors.pink, 100),
-  ItemData(7),
-  ItemData(8, Colors.yellowAccent)
+final listB = <ItemData>[
+  const ItemData(2),
+  const ItemData(6),
+  const ItemData(5, Colors.pink, 100),
+  const ItemData(7),
+  const ItemData(8, Colors.yellowAccent)
 ];
 
 final controller = AnimatedListController();

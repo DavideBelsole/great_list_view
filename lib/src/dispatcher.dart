@@ -107,10 +107,10 @@ class AnimatedListDiffDispatcher<T> {
     }
 
     _oldList = _currentList;
-    _currentList = _processingList!;
+    _currentList = _processingList as T;
     _processingList = null;
 
-    final oldList = _oldList!;
+    final oldList = _oldList as T;
 
     controller.batch(() {
       dr._dispatchUpdatesTo(
@@ -157,16 +157,16 @@ class AnimatedListDiffDispatcher<T> {
     if ((comparator.lengthOf(oldList) + comparator.lengthOf(newList) >=
         spawnNewInsolateCount)) {
       final completer = Completer<_DiffResultDispatcher>();
-      _cancelable = Executor().execute<T, T, AnimatedListDiffBaseComparator<T>,
-              void, _DiffResultDispatcher>(
-          arg1: oldList, arg2: newList, arg3: comparator, fun3: _calculateDiff)
-        ..then((value) {
-          _cancelable = null;
-          completer.complete(value);
-        }).catchError((e) {});
+      _cancelable = Executor().execute(
+        arg1: oldList, arg2: newList, arg3: comparator, fun3: _calculateDiff,
+      )
+      ..then((value) {
+        _cancelable = null;
+        completer.complete(value);
+      }).catchError((e) {});
       return completer.future;
     } else {
-      return _calculateDiff(oldList, newList, comparator);
+      return _calculateDiff(oldList, newList, comparator, null);
     }
   }
 
@@ -180,7 +180,11 @@ class AnimatedListDiffDispatcher<T> {
 }
 
 _DiffResultDispatcher _calculateDiff<T>(
-    T oldList, T newList, AnimatedListDiffBaseComparator<T> comparator) {
+  final T oldList,
+  final T newList,
+  final AnimatedListDiffBaseComparator<T> comparator,
+  final TypeSendPort? port,
+) {
   return _DiffResultDispatcher(calculateDiff(
     _DiffDelegate<T>(
       oldList,
@@ -228,10 +232,10 @@ class _DiffDelegate<T> implements DiffDelegate {
 }
 
 enum _OperationType {
-  INSERT,
-  REMOVE,
-  REPLACE,
-  CHANGE,
+  insert,
+  remove,
+  replace,
+  change,
 }
 
 class _Operation {
@@ -247,20 +251,20 @@ class _Operation {
 
   String get typeToString {
     switch (type) {
-      case _OperationType.INSERT:
+      case _OperationType.insert:
         return 'INS';
-      case _OperationType.REMOVE:
+      case _OperationType.remove:
         return 'REM';
-      case _OperationType.REPLACE:
+      case _OperationType.replace:
         return 'REP';
-      case _OperationType.CHANGE:
+      case _OperationType.change:
         return 'CHG';
     }
   }
 
   @override
   String toString() {
-    if (type == _OperationType.REPLACE) {
+    if (type == _OperationType.replace) {
       return '$typeToString $position ($count1,$count2)';
     } else {
       return '$typeToString $position ($count1)';
@@ -286,7 +290,7 @@ class _DiffResultDispatcher {
         insert: (position, count) {
           if (position == _removedPosition) {
             _list.add(_Operation(
-                type: _OperationType.REPLACE,
+                type: _OperationType.replace,
                 position: position,
                 count1: _removedCount,
                 count2: count));
@@ -294,7 +298,7 @@ class _DiffResultDispatcher {
           } else {
             _pushPendings();
             _list.add(_Operation(
-                type: _OperationType.INSERT,
+                type: _OperationType.insert,
                 position: position,
                 count1: count));
           }
@@ -320,14 +324,14 @@ class _DiffResultDispatcher {
   void _pushPendings() {
     if (_removedPosition != null) {
       _list.add(_Operation(
-          type: _OperationType.REMOVE,
+          type: _OperationType.remove,
           position: _removedPosition!,
           count1: _removedCount));
       _removedPosition = null;
     }
     if (_changedPosition != null) {
       _list.add(_Operation(
-          type: _OperationType.CHANGE,
+          type: _OperationType.change,
           position: _changedPosition! - _changedCount + 1,
           count1: _changedCount));
       _changedPosition = null;
@@ -341,16 +345,16 @@ class _DiffResultDispatcher {
       void Function(int position, int count)? onChange}) {
     for (final op in _list) {
       switch (op.type) {
-        case _OperationType.INSERT:
+        case _OperationType.insert:
           onInsert?.call(op.position, op.count1);
           break;
-        case _OperationType.REMOVE:
+        case _OperationType.remove:
           onRemove?.call(op.position, op.count1);
           break;
-        case _OperationType.REPLACE:
+        case _OperationType.replace:
           onReplace?.call(op.position, op.count1, op.count2!);
           break;
-        case _OperationType.CHANGE:
+        case _OperationType.change:
           onChange?.call(op.position, op.count1);
           break;
       }

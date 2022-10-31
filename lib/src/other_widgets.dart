@@ -11,7 +11,7 @@ class ArrowButton extends StatefulWidget {
   final Icon icon;
   final double turns;
 
-  ArrowButton({
+  const ArrowButton({
     Key? key,
     this.expanded = false,
     this.onTap,
@@ -22,7 +22,7 @@ class ArrowButton extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _ArrowButtonState createState() => _ArrowButtonState();
+  State<ArrowButton> createState() => _ArrowButtonState();
 }
 
 class _ArrowButtonState extends State<ArrowButton>

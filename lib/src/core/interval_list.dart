@@ -5,9 +5,9 @@ abstract class _ListIntervalInterface extends BuildContext {
   bool get isHorizontal;
   Widget buildWidget(
       AnimatedWidgetBuilder builder, int index, AnimatedWidgetBuilderData data);
-  void resizingIntervalUpdated(_AnimatedSpaceInterval interval, double delta);
-  Future<_Measure> measureItems(
-      _Cancelled? cancelled, int count, IndexedWidgetBuilder builder);
+  void resizingIntervalUpdated(AnimatedSpaceInterval interval, double delta);
+  Future<Measure> measureItems(
+      Cancelled? cancelled, int count, IndexedWidgetBuilder builder);
   double measureItem(Widget widget);
   void markNeedsBuild();
   void markNeedsLayout();
@@ -448,11 +448,11 @@ class _IntervalList extends LinkedList<_Interval> with TickerProviderMixin {
             interval.priority);
         addUpdate(buildItemIndexOf(interval), interval.buildCount,
             newInterval.buildCount,
-            mode: _UpdateFlags(_UpdateFlags.DISCARD_ELEMENT |
-                _UpdateFlags.CLEAR_LAYOUT_OFFSET |
+            mode: _UpdateFlags(_UpdateFlags.discardElement |
+                _UpdateFlags.clearLayoutOffset |
                 (interval.fromSize!.estimated
                     ? 0
-                    : _UpdateFlags.KEEP_FIRST_LAYOUT_OFFSET)));
+                    : _UpdateFlags.keepFirstLayoutOffset)));
         _replace(interval, newInterval);
         if (newInterval.canCompleteImmediately) {
           (newInterval._animation as _ControlledAnimation).complete();
@@ -471,11 +471,11 @@ class _IntervalList extends LinkedList<_Interval> with TickerProviderMixin {
             _createAnimation(animator.incoming())..start(), interval.toLength);
         _replace(interval, isi);
         addUpdate(buildItemIndexOf(isi), interval.buildCount, isi.buildCount,
-            mode: _UpdateFlags(_UpdateFlags.DISCARD_ELEMENT |
-                _UpdateFlags.CLEAR_LAYOUT_OFFSET |
+            mode: _UpdateFlags(_UpdateFlags.discardElement |
+                _UpdateFlags.clearLayoutOffset |
                 (interval.toSize.estimated
                     ? 0
-                    : _UpdateFlags.KEEP_FIRST_LAYOUT_OFFSET)));
+                    : _UpdateFlags.keepFirstLayoutOffset)));
       });
     }
 
@@ -492,7 +492,7 @@ class _IntervalList extends LinkedList<_Interval> with TickerProviderMixin {
 
   /// This is Called when an [interval] has completed its animation.
   /// It could transform that interval into a new type of interval.
-  void _onIntervalCompleted(_AnimatedInterval interval) {
+  void _onIntervalCompleted(AnimatedInterval interval) {
     if (interval is _MoveDropInterval) {
       if (interval.areAnimationsCompleted) {
         final buildOffset = buildItemIndexOf(interval);
@@ -500,7 +500,7 @@ class _IntervalList extends LinkedList<_Interval> with TickerProviderMixin {
         interval.popUpList.interval =
             null; // this marks the pop-up list to be removed
         addUpdate(buildOffset, 1, 1,
-            mode: const _UpdateFlags(_UpdateFlags.POPUP_DROP),
+            mode: const _UpdateFlags(_UpdateFlags.popupDrop),
             ref: interval.popUpList);
       }
     } else if (interval is _RemovalInterval) {
@@ -554,8 +554,8 @@ class _IntervalList extends LinkedList<_Interval> with TickerProviderMixin {
               buildItemIndexOf(leftInterval!),
               leftInterval.buildCount + interval.buildCount,
               mergeResult.mergedInterval.buildCount,
-              mode: const _UpdateFlags(_UpdateFlags.CLEAR_LAYOUT_OFFSET |
-                  _UpdateFlags.KEEP_FIRST_LAYOUT_OFFSET));
+              mode: const _UpdateFlags(_UpdateFlags.clearLayoutOffset |
+                  _UpdateFlags.keepFirstLayoutOffset));
         }
         interval.dispose();
         _replace(leftInterval!, interval = mergeResult.mergedInterval);
@@ -656,7 +656,7 @@ class _IntervalList extends LinkedList<_Interval> with TickerProviderMixin {
         const _CompletedAnimation(), popUpList.itemSize, popUpList.itemSize);
     reorderInterval.insertBefore(openingInterval);
     addUpdate(info.buildIndex + offset, 1, 1,
-        mode: const _UpdateFlags(_UpdateFlags.POPUP_PICK), ref: popUpList);
+        mode: const _UpdateFlags(_UpdateFlags.popupPick), ref: popUpList);
   }
 
   /// It converts the open (or opening) interval with a [_MoveDropInterval].
@@ -780,7 +780,7 @@ class _IntervalList extends LinkedList<_Interval> with TickerProviderMixin {
     final resizingInterval = _ResizingInterval(
         _createAnimation(animator.resizing(interval.currentSize, 0.0))..start(),
         interval.currentSize.toExactMeasure(),
-        _Measure.zero,
+        Measure.zero,
         interval.currentLength,
         0,
         priority);

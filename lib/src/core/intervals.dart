@@ -16,7 +16,7 @@ class _MergeResult {
   final bool physicalMerge;
 }
 
-class _Cancelled {
+class Cancelled {
   bool value = false;
 }
 
@@ -77,12 +77,12 @@ abstract class _Interval extends LinkedListEntry<_Interval> {
 /// Interval with animation feature.
 ///
 /// An animation will be attached to this interval and automatically detached when the latter is disposed.
-abstract class _AnimatedInterval extends _Interval {
-  _AnimatedInterval(this._animation) {
+abstract class AnimatedInterval extends _Interval {
+  AnimatedInterval(this._animation) {
     _animation.attachTo(this);
   }
 
-  final _Animation _animation;
+  final ListAnimation _animation;
 
   bool get isWaitingAtBeginning => _animation.isWaitingAtBeginning;
 
@@ -99,8 +99,8 @@ abstract class _AnimatedInterval extends _Interval {
 }
 
 /// Interval that builds a range of items covered of the underlying list with animation.
-abstract class _InListItemInterval extends _AnimatedInterval {
-  _InListItemInterval(_Animation animation, this.length)
+abstract class _InListItemInterval extends AnimatedInterval {
+  _InListItemInterval(ListAnimation animation, this.length)
       : assert(length >= 0),
         super(animation);
 
@@ -127,9 +127,9 @@ abstract class _InListItemInterval extends _AnimatedInterval {
 /// Animated interval that builds a range of an off-list items (for example a range of removed
 /// or changed items no longer present in the underlying list).
 /// The [inLength] of the underlying items covered is preserved.
-abstract class _OffListItemInterval extends _AnimatedInterval {
+abstract class _OffListItemInterval extends AnimatedInterval {
   _OffListItemInterval(
-      _Animation animation, this.builder, this.offLength, this.inLength)
+      ListAnimation animation, this.builder, this.offLength, this.inLength)
       : assert(offLength >= 0 && inLength >= 0),
         super(animation);
 
@@ -176,7 +176,7 @@ abstract class _HolderInterval extends _Interval {
 ///
 /// This mark is checked by the [_IntervalList._onReplaceNotification] and
 /// [_IntervalList._onReplaceNotification] methods.
-abstract class _SplittableInterval implements _AnimatedInterval {
+abstract class _SplittableInterval implements AnimatedInterval {
   /// Splits this interval in the middle by creating two new intervals on the left (if [leading] is
   /// greater than zero) and right (if [trailing] is greater then zero).
   _SplitResult split(int leading, int trailing);
@@ -199,7 +199,7 @@ abstract class _AdjustableInterval extends _Interval {
 /// A space interval is built as a single item but covers many items of the underlying list.
 ///
 /// This mark is checked by the [AnimatedRenderSliverMultiBoxAdaptor._extrapolateMaxScrollOffset],
-/// [AnimatedRenderSliverMultiBoxAdaptor._estimateLayoutOffset], 
+/// [AnimatedRenderSliverMultiBoxAdaptor._estimateLayoutOffset],
 /// [AnimatedRenderSliverFixedExtentList.indexToLayoutOffset],
 /// [AnimatedRenderSliverFixedExtentList.computeMaxScrollOffset],
 /// [AnimatedRenderSliverFixedExtentList.getMinChildIndexForScrollOffset] and
@@ -226,16 +226,16 @@ abstract class _ResizableInterval extends _SpaceInterval {
 }
 
 /// Interval that is built as an animated space interval.
-class _AnimatedSpaceInterval extends _AnimatedInterval
+class AnimatedSpaceInterval extends AnimatedInterval
     implements _SpaceInterval {
-  _AnimatedSpaceInterval(_Animation animation, this.fromSize, this.toSize,
+  AnimatedSpaceInterval(ListAnimation animation, this.fromSize, this.toSize,
       this.fromLength, this.toLength)
       : lastRenderedSize = fromSize.value,
         super(animation) {
     _animation.animation.addListener(onTick);
   }
 
-  final _Measure fromSize, toSize;
+  final Measure fromSize, toSize;
 
   final double fromLength;
   final int toLength;
@@ -331,9 +331,9 @@ abstract class _ReadyToInterval {
 ///
 /// This mark is checked by the [_IntervalList.coordinate] method.
 mixin _ReadyToResizingInterval implements _Interval, _ReadyToInterval {
-  _Measure? fromSize, toSize;
+  Measure? fromSize, toSize;
 
-  _Cancelled? cancelled;
+  Cancelled? cancelled;
 
   bool isMeasuring = false;
 
@@ -343,7 +343,7 @@ mixin _ReadyToResizingInterval implements _Interval, _ReadyToInterval {
     assert(_debugAssertNotDisposed());
     assert(cancelled == null);
 
-    cancelled = _Cancelled();
+    cancelled = Cancelled();
     isMeasuring = true;
 
     if (fromSize == null) {
@@ -352,7 +352,7 @@ mixin _ReadyToResizingInterval implements _Interval, _ReadyToInterval {
 
     if (!cancelled!.value && toSize == null) {
       if (itemCount == 0) {
-        toSize = _Measure.zero;
+        toSize = Measure.zero;
       } else {
         await measureToSize();
       }
@@ -375,7 +375,7 @@ mixin _ReadyToResizingInterval implements _Interval, _ReadyToInterval {
         (context, index) => intervalList.inListBuilder.call(
             index,
             intervalList.listItemIndexOf(this),
-            AnimatedWidgetBuilderData(kAlwaysCompleteAnimation,
+            const AnimatedWidgetBuilderData(kAlwaysCompleteAnimation,
                 measuring: true)));
   }
 
@@ -446,7 +446,7 @@ class _NormalInterval extends _InListItemInterval
 /// It is created against a [_SplittableInterval].
 class _ReadyToRemovalInterval extends _OffListItemInterval
     implements _AdjustableInterval, _ReadyToInterval {
-  _ReadyToRemovalInterval(_Animation animation, _IntervalBuilder builder,
+  _ReadyToRemovalInterval(ListAnimation animation, _IntervalBuilder builder,
       int offLength, int inLength, this.priority)
       : super(animation, builder, offLength, inLength);
 
@@ -494,7 +494,7 @@ class _ReadyToRemovalInterval extends _OffListItemInterval
 /// It is created against a [_ReadyToRemovalInterval].
 class _RemovalInterval extends _OffListItemInterval
     implements _AdjustableInterval {
-  _RemovalInterval(_Animation animation, _IntervalBuilder builder,
+  _RemovalInterval(ListAnimation animation, _IntervalBuilder builder,
       int offLength, int inLength, this.priority)
       : super(animation, builder, offLength, inLength);
 
@@ -519,7 +519,7 @@ class _RemovalInterval extends _OffListItemInterval
 /// It is created against a [_ReadyToInsertionInterval] or [_ReadyToChangingInterval].
 class _InsertionInterval extends _InListItemInterval
     implements _SplittableInterval {
-  _InsertionInterval(_Animation animation, int length)
+  _InsertionInterval(ListAnimation animation, int length)
       : super(animation, length);
 
   @override
@@ -542,10 +542,10 @@ class _InsertionInterval extends _InListItemInterval
 /// an initial size to a final size.
 ///
 /// It is created against a [_ReadyToResizingInterval].
-class _ResizingInterval extends _AnimatedSpaceInterval
+class _ResizingInterval extends AnimatedSpaceInterval
     implements _ResizableInterval {
-  _ResizingInterval(_ControlledAnimation animation, _Measure fromSize,
-      _Measure toSize, double fromLength, int toLength, this.priority)
+  _ResizingInterval(_ControlledAnimation animation, Measure fromSize,
+      Measure toSize, double fromLength, int toLength, this.priority)
       : super(animation, fromSize, toSize, fromLength, toLength);
 
   final int priority;
@@ -572,7 +572,7 @@ class _ReadyToInsertionInterval extends _Interval
   _ReadyToInsertionInterval(this.toSize, this.toLength, this.priority)
       : assert(toLength >= 0);
 
-  final _Measure toSize;
+  final Measure toSize;
 
   final int toLength;
 
@@ -633,7 +633,7 @@ class _ReadyToInsertionInterval extends _Interval
 class _ReadyToResizingIntervalFromRemoval extends _OffListItemInterval
     with _ReadyToResizingInterval
     implements _AdjustableInterval {
-  _ReadyToResizingIntervalFromRemoval(_Animation animation,
+  _ReadyToResizingIntervalFromRemoval(ListAnimation animation,
       _IntervalBuilder builder, int offLength, int inLength, this.priority)
       : super(animation, builder, offLength, inLength);
 
@@ -657,7 +657,7 @@ class _ReadyToResizingIntervalFromRemoval extends _OffListItemInterval
             context,
             index,
             listItemOffset,
-            AnimatedWidgetBuilderData(kAlwaysDismissedAnimation,
+            const AnimatedWidgetBuilderData(kAlwaysDismissedAnimation,
                 measuring: true)));
   }
 
@@ -748,7 +748,7 @@ class _ReadyToResizingSpawnedInterval extends _HolderInterval
     implements _AdjustableInterval {
   _ReadyToResizingSpawnedInterval(int inLength, this.priority)
       : super(inLength) {
-    fromSize = _Measure.zero;
+    fromSize = Measure.zero;
   }
 
   @override
@@ -786,7 +786,7 @@ class _ReadyToResizingSpawnedInterval extends _HolderInterval
 class _ReadyToChangingInterval extends _OffListItemInterval
     implements _SplittableInterval, _ReadyToInterval {
   _ReadyToChangingInterval(
-      _Animation animation, _IntervalBuilder builder, int length, this.priority)
+      ListAnimation animation, _IntervalBuilder builder, int length, this.priority)
       : super(animation, builder, length, length);
 
   @override
@@ -838,9 +838,9 @@ class _ReadyToChangingInterval extends _OffListItemInterval
 // Intervals for Reordering & Moving
 //
 
-class _ReorderSpaceInterval extends _AnimatedSpaceInterval {
+class _ReorderSpaceInterval extends AnimatedSpaceInterval {
   _ReorderSpaceInterval(
-      _Animation animation, this.itemSize, double fromSize, double toSize)
+      ListAnimation animation, this.itemSize, double fromSize, double toSize)
       : super(animation, fromSize.toExactMeasure(), toSize.toExactMeasure(), 0,
             0);
 
@@ -853,7 +853,7 @@ class _ReorderSpaceInterval extends _AnimatedSpaceInterval {
 /// Interval created during reordering that indicates an opening gap between two items.
 class _ReorderOpeningInterval extends _ReorderSpaceInterval {
   _ReorderOpeningInterval(
-      _Animation animation, double itemSize, double fromSize)
+      ListAnimation animation, double itemSize, double fromSize)
       : super(animation, itemSize, fromSize, itemSize);
 
   @override
@@ -866,7 +866,7 @@ class _ReorderOpeningInterval extends _ReorderSpaceInterval {
 /// Interval created during reordering that indicates a closing gap between two items.
 class _ReorderClosingInterval extends _ReorderSpaceInterval {
   _ReorderClosingInterval(
-      _Animation animation, double itemSize, double fromSize)
+      ListAnimation animation, double itemSize, double fromSize)
       : super(animation, itemSize, fromSize, 0);
 
   @override
@@ -923,9 +923,9 @@ class _ReorderHolderNormalInterval extends _HolderInterval
 /// This interval cannot be build and doesn't hold any underlying item.
 /// It is just linked to a pop-up list in order to build an off-list pop-up removing item.
 /// Those kind of intevrals are added at the end of the interval list in order to be treated as if they were unlinked.
-class _MoveRemovingInterval extends _AnimatedInterval
+class _MoveRemovingInterval extends AnimatedInterval
     implements _PopUpInterval {
-  _MoveRemovingInterval(this.popUpList, _Animation animation, this.builder)
+  _MoveRemovingInterval(this.popUpList, ListAnimation animation, this.builder)
       : super(animation) {
     popUpList.interval = this;
   }
@@ -966,9 +966,9 @@ class _MoveRemovingInterval extends _AnimatedInterval
 /// This interval is built as an animated space interval.
 /// In addition, this interval is linked to a pop-up list of moving items.
 /// The [moveAnimation] is used to calculate the scroll offset of the moving items.
-class _MoveDropInterval extends _AnimatedSpaceInterval
+class _MoveDropInterval extends AnimatedSpaceInterval
     implements _PopUpRemovableInterval, _PopUpChangeableInterval {
-  _MoveDropInterval(this.popUpList, _Animation animation, this.moveAnimation,
+  _MoveDropInterval(this.popUpList, ListAnimation animation, this.moveAnimation,
       this.itemSize, double fromSize, this.fromOffset)
       : super(animation, fromSize.toExactMeasure(), itemSize.toExactMeasure(),
             1, 1) {

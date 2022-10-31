@@ -8,7 +8,7 @@ import 'core/core.dart';
 
 const int _kWindowSize = 80;
 
-const int _NOTIFICATION_PRIORITY = 0x1000;
+const int _kNotificationPriority = 0x1000;
 
 bool _kEquals(dynamic a, dynamic b) => a == b;
 
@@ -118,19 +118,19 @@ class TreeListAdapter<T> {
       bool alwaysExpandRoot = true,
       bool keepCurrentLevel = true,
       int? windowSize = _kWindowSize]) {
-    var _this = this;
+    final me = this;
     return TreeListAdapter(
       root: node,
-      parentOf: (n) => _this.parentOf(n),
+      parentOf: (n) => me.parentOf(n),
       childrenCount: childrenCount,
       childAt: childAt,
       isNodeExpanded: (n) => (alwaysExpandRoot && equals(n, node))
           ? true
-          : _this.isNodeExpanded(n),
+          : me.isNodeExpanded(n),
       indexOfChild: indexOfChild,
       equals: equals,
       includeRoot: includeRoot,
-      windowSize: windowSize ?? _this.windowSize,
+      windowSize: windowSize ?? me.windowSize,
       startingLevel:
           keepCurrentLevel ? (levelOf(node) + (includeRoot ? 0 : 1)) : 0,
     );
@@ -250,7 +250,7 @@ class TreeListAdapter<T> {
                         1,
                         (context, idx, data) =>
                             builder!.call(context, this, from - 1, data),
-                        _NOTIFICATION_PRIORITY);
+                        _kNotificationPriority);
                   }
                 });
               });
@@ -298,7 +298,7 @@ class TreeListAdapter<T> {
                         1,
                         (context, idx, data) =>
                             builder!.call(context, this, from - 1, data),
-                        _NOTIFICATION_PRIORITY);
+                        _kNotificationPriority);
                   }
                 });
               });
@@ -355,7 +355,7 @@ class TreeListAdapter<T> {
                             1,
                             (context, idx, data) =>
                                 builder!.call(context, this, parentIndex, data),
-                            _NOTIFICATION_PRIORITY);
+                            _kNotificationPriority);
                       }
                     }
                   }
@@ -411,7 +411,7 @@ class TreeListAdapter<T> {
                             1,
                             (context, idx, data) =>
                                 builder!.call(context, this, parentIndex, data),
-                            _NOTIFICATION_PRIORITY);
+                            _kNotificationPriority);
                       }
                     }
                   }
@@ -492,14 +492,14 @@ class TreeListAdapter<T> {
               i1,
               1,
               (context, idx, data) => builder!.call(context, this, i1, data),
-              _NOTIFICATION_PRIORITY);
+              _kNotificationPriority);
         }
         if (i2 != null) {
           controller!.notifyChangedRange(
               i2,
               1,
               (context, idx, data) => builder!.call(context, this, i2, data),
-              _NOTIFICATION_PRIORITY);
+              _kNotificationPriority);
         }
       });
     }
@@ -567,7 +567,7 @@ class TreeListAdapter<T> {
   int? nodeToIndex(T node) {
     if (equals(node, root)) return (includeRoot ? 0 : -1);
     for (var i = 0; i < windowSize; i++) {
-      if (_list[i] != null && equals(_list[i]!, node)) {
+      if (_list[i] != null && equals(_list[i] as T, node)) {
         return i + _offset + (includeRoot ? 1 : 0);
       }
     }
@@ -606,8 +606,8 @@ class TreeListAdapter<T> {
         node = _cachedNode(i);
         if (node != null) {
           _iterateForward(node, i, index);
-          node = _cachedNode(index)!;
-          return node;
+          node = _cachedNode(index) as T;
+          return node!;
         }
       }
       if (++j < _endOffset) {
@@ -615,14 +615,14 @@ class TreeListAdapter<T> {
         node = _cachedNode(j);
         if (node != null) {
           _iterateBackward(node, j, index);
-          node = _cachedNode(index)!;
-          return node;
+          node = _cachedNode(index) as T;
+          return node!;
         }
       }
     } while (next);
     _iterateForward(root, -1, index);
-    node = _cachedNode(index)!;
-    return node;
+    node = _cachedNode(index) as T;
+    return node!;
   }
 
   void _iterateForward(T node, int index, int toIndex) {
@@ -711,7 +711,7 @@ class TreeListAdapter<T> {
     var i = (toIndex > fromIndex) ? toIndex : toIndex - 1;
     if (i == -1) {
       assert(!includeRoot);
-      return IntRange(0, 1);
+      return const IntRange(0, 1);
     }
     var prevNode = indexToNode(i);
 

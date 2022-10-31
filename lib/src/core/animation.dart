@@ -1,7 +1,7 @@
 part of 'core.dart';
 
-abstract class _Animation {
-  const _Animation();
+abstract class ListAnimation {
+  const ListAnimation();
 
   Animation<double> get animation;
   double get time;
@@ -11,12 +11,12 @@ abstract class _Animation {
   bool get isWaitingAtEnd =>
       time == 1.0 && animation.status == AnimationStatus.completed;
 
-  void attachTo(_AnimatedInterval interval) {}
-  void detachFrom(_AnimatedInterval interval) {}
+  void attachTo(AnimatedInterval interval) {}
+  void detachFrom(AnimatedInterval interval) {}
   void dispose() {}
 }
 
-class _CompletedAnimation extends _Animation {
+class _CompletedAnimation extends ListAnimation {
   const _CompletedAnimation();
 
   @override
@@ -26,7 +26,7 @@ class _CompletedAnimation extends _Animation {
   double get time => 1.0;
 }
 
-class _DismissedAnimation extends _Animation {
+class _DismissedAnimation extends ListAnimation {
   const _DismissedAnimation();
 
   @override
@@ -36,7 +36,7 @@ class _DismissedAnimation extends _Animation {
   double get time => 0.0;
 }
 
-class _ControlledAnimation extends _Animation with ChangeNotifier {
+class _ControlledAnimation extends ListAnimation with ChangeNotifier {
   _ControlledAnimation(
       TickerProvider vsync, Animatable<double> animatable, Duration duration,
       {double startTime = 0.0, this.onDispose})
@@ -47,7 +47,7 @@ class _ControlledAnimation extends _Animation with ChangeNotifier {
   }
 
   final AnimationController _controller;
-  final intervals = <_AnimatedInterval>{};
+  final intervals = <AnimatedInterval>{};
   final void Function(_ControlledAnimation a)? onDispose;
 
   bool _disposed = false;
@@ -62,14 +62,14 @@ class _ControlledAnimation extends _Animation with ChangeNotifier {
   double get value => animation.value;
 
   @override
-  void attachTo(_AnimatedInterval interval) {
+  void attachTo(AnimatedInterval interval) {
     assert(_debugAssertNotDisposed());
     assert(!intervals.contains(interval));
     intervals.add(interval);
   }
 
   @override
-  void detachFrom(_AnimatedInterval interval) {
+  void detachFrom(AnimatedInterval interval) {
     assert(_debugAssertNotDisposed());
     assert(intervals.contains(interval));
     intervals.remove(interval);
