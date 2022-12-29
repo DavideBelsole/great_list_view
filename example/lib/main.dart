@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:great_list_view/great_list_view.dart';
-import 'package:worker_manager/worker_manager.dart';
 
 void main() {
   Executor().warmUp();
@@ -66,6 +65,7 @@ class _BodyState extends State<Body> {
         listController: controller,
         addLongPressReorderable: true,
         reorderModel: AutomaticAnimatedListReorderModel(currentList),
+        detectMoves: true,
       ),
     );
   }
@@ -107,16 +107,17 @@ List<ItemData> listA = [
   ItemData(1, Colors.orange),
   ItemData(2),
   ItemData(3),
-  ItemData(4),
+  ItemData(4, Colors.cyan),
   ItemData(5),
   ItemData(8, Colors.green)
 ];
 List<ItemData> listB = [
+  ItemData(4, Colors.cyan),
   ItemData(2),
   ItemData(6),
   ItemData(5, Colors.pink, 100),
   ItemData(7),
-  ItemData(8, Colors.yellowAccent)
+  ItemData(8, Colors.yellowAccent),
 ];
 
 final controller = AnimatedListController();

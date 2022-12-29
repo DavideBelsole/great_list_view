@@ -1,83 +1,31 @@
-import 'dart:collection';
+library great_list_view.other;
 
-import 'package:flutter/foundation.dart';
+import 'dart:collection';
+import 'dart:math' as math;
+
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:collection/collection.dart';
 
 import 'ticker_mixin.dart';
 
 typedef MorphComparator = bool Function(Widget a, Widget b);
 
-/// Wraps the [child] widget in a [Material] widget in order to provide an implicit
-/// animation of the [Material.elevation] attribute.
-class AnimatedElevation extends ImplicitlyAnimatedWidget {
-  const AnimatedElevation(
-      {Key? key,
-      this.child,
-      this.elevation = 0.0,
-      Curve curve = Curves.linear,
-      required Duration duration,
-      VoidCallback? onEnd})
-      : super(key: key, curve: curve, duration: duration, onEnd: onEnd);
-
-  final double elevation;
-  final Widget? child;
-
-  @override
-  _AnimatedElevationWidgetState createState() =>
-      _AnimatedElevationWidgetState();
-
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-    properties.add(DoubleProperty('elevation', elevation));
-  }
-}
-
-class _AnimatedElevationWidgetState
-    extends AnimatedWidgetBaseState<AnimatedElevation> {
-  Tween<double>? _elevation;
-
-  @override
-  void forEachTween(TweenVisitor<dynamic> visitor) {
-    _elevation = visitor(_elevation, widget.elevation,
-            (dynamic value) => Tween<double>(begin: value as double))
-        as Tween<double>?;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final animation = this.animation;
-    return Material(
-      elevation: _elevation!.evaluate(animation),
-      child: widget.child,
-    );
-  }
-
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder description) {
-    super.debugFillProperties(description);
-    description.add(DiagnosticsProperty<Tween<double>>('elevation', _elevation,
-        showName: false, defaultValue: 0.0));
-  }
-}
-
 /// This widget every time it is rebuilt creates a crossfade effect by making the old [child] widget
-/// disappear and making the new one appear.
-/// 
+/// disappear and the new one appear.
+///
 /// If the instance of the [child] widget doesn't change, the crossfade effect doesn't occur.
 /// If the new [child] widget has a different instance, the [comparator] is used to determine if
-/// the new widget is really different from the old one. Only if it returns `true` the crossfade 
-/// effect doesn't occur.
-/// 
+/// the new widget is really different from the old one. Only if it returns `false` the crossfade
+/// effect occur.
+///
 /// When the crossfade occurs, the [resizeWidgets] attribute is queried. If it is `true`, both children
-/// (the old and the new) are resized during the animation, forcing them to have the same size in each frame, 
+/// (the old and the new) are resized during the animation, forcing them to have the same size in each frame,
 /// changing from the size of the old child to the size of the new child.
 /// If it is `false`, both children keep their size during animation, inevitably causing cropping of the
 /// biggest child (but only if their dimensions are obviously different).
 class MorphTransition extends RenderObjectWidget {
-  MorphTransition({
+  const MorphTransition({
     Key? key,
     required this.child,
     required this.comparator,
@@ -95,12 +43,12 @@ class MorphTransition extends RenderObjectWidget {
   final Clip clipBehavior;
 
   @override
-  _MorphRenderObjectElement createElement() => _MorphRenderObjectElement(this);
+  MorphRenderObjectElement createElement() => MorphRenderObjectElement(this);
 
   @override
-  _MorphRenderStack createRenderObject(BuildContext context) {
-    return _MorphRenderStack(
-      context as _MorphRenderObjectElement,
+  MorphRenderStack createRenderObject(BuildContext context) {
+    return MorphRenderStack(
+      context as MorphRenderObjectElement,
       textDirection: textDirection ?? Directionality.of(context),
       clipBehavior: clipBehavior,
       resizeChildrenWhenAnimating: resizeWidgets,
@@ -108,8 +56,7 @@ class MorphTransition extends RenderObjectWidget {
   }
 
   @override
-  void updateRenderObject(
-      BuildContext context, _MorphRenderStack renderObject) {
+  void updateRenderObject(BuildContext context, MorphRenderStack renderObject) {
     renderObject
       ..textDirection = textDirection ?? Directionality.of(context)
       ..clipBehavior = clipBehavior
@@ -117,15 +64,15 @@ class MorphTransition extends RenderObjectWidget {
   }
 }
 
-class _MorphRenderStack extends RenderStack {
-  final _MorphRenderObjectElement _element;
+class MorphRenderStack extends RenderStack {
+  final MorphRenderObjectElement _element;
   final _animations = HashMap<RenderBox, AnimationController>();
   var _paintRenderObjects = HashMap<RenderBox?, int>();
   bool _resizeChildrenWhenAnimating;
   ClipRectLayer? _clipRectLayer;
-  var _opacityLayer = <OpacityLayer>[];
+  final _opacityLayer = <LayerHandle<OpacityLayer>>[];
 
-  _MorphRenderStack(
+  MorphRenderStack(
     this._element, {
     bool resizeChildrenWhenAnimating = false,
     TextDirection? textDirection,
@@ -158,6 +105,7 @@ class _MorphRenderStack extends RenderStack {
     if (controller.status == AnimationStatus.reverse ||
         controller.status == AnimationStatus.dismissed) return;
     final t = controller.reverse();
+
     void remove(RenderBox child) {
       _animations.remove(child);
       _element._markToRemove(child);
@@ -166,7 +114,11 @@ class _MorphRenderStack extends RenderStack {
     if (controller.status == AnimationStatus.dismissed) {
       remove(child);
     } else {
-      t.whenComplete(() => remove(child));
+      t.whenComplete(() {
+        if (controller.status == AnimationStatus.forward ||
+            controller.status == AnimationStatus.completed) return;
+        remove(child);
+      });
     }
   }
 
@@ -191,29 +143,31 @@ class _MorphRenderStack extends RenderStack {
   void _updateAnimation() {
     final newPaint = HashMap<RenderBox?, int>();
 
-    var onlyOne = false;
+    var hasFullVisibleOne = false;
 
     for (var child = firstChild; child != null; child = childAfter(child)) {
-      var a = _getAnimationOf(child);
-      if (a.isDismissed || a.value == 0.0) continue;
-      if (a.isCompleted || a.value == 1.0) {
-        onlyOne = true;
+      final a = _getAnimationOf(child);
+      final alpha = Color.getAlphaFromOpacity(a.value);
+      if (a.isDismissed || alpha == 0) continue;
+      if (a.isCompleted || alpha == 255) {
+        hasFullVisibleOne = true;
       }
-      newPaint[child] = Color.getAlphaFromOpacity(a.value);
+      newPaint[child] = alpha;
     }
 
-    if (_comparePaints(_paintRenderObjects, newPaint)) return;
+    if (!_comparePaints(_paintRenderObjects, newPaint)) {
+      _paintRenderObjects = newPaint;
 
-    _paintRenderObjects = newPaint;
+      final didNeedCompositing = _currentlyNeedsCompositing;
+      _currentlyNeedsCompositing =
+          !hasFullVisibleOne && _paintRenderObjects.isNotEmpty;
 
-    markNeedsLayout();
-    markNeedsPaint();
+      if (didNeedCompositing != _currentlyNeedsCompositing) {
+        markNeedsCompositingBitsUpdate();
+      }
 
-    final didNeedCompositing = _currentlyNeedsCompositing;
-    _currentlyNeedsCompositing = !onlyOne;
-
-    if (didNeedCompositing != _currentlyNeedsCompositing) {
-      markNeedsCompositingBitsUpdate();
+      markNeedsLayout();
+      markNeedsPaint();
     }
   }
 
@@ -242,10 +196,19 @@ class _MorphRenderStack extends RenderStack {
   void paint(PaintingContext context, Offset offset) {
     final list = _paintRenderObjects.entries.toList();
 
-    if (list.any((e) => e.value == 255)) {
+    if (list.isEmpty) {
+      assert(!needsCompositing);
       layer = null;
-      _opacityLayer.clear();
-      context.paintChild(list.where((e) => e.value == 255).first.key!, offset);
+      _disposeLayers(0);
+      return;
+    }
+
+    final fullVisibleChild = list.firstWhereOrNull((e) => e.value == 255);
+    if (fullVisibleChild != null) {
+      assert(!needsCompositing);
+      layer = null;
+      _disposeLayers(0);
+      context.paintChild(fullVisibleChild.key!, offset);
       return;
     }
 
@@ -258,21 +221,35 @@ class _MorphRenderStack extends RenderStack {
     }
 
     void paintChildren(PaintingContext context, Offset offset) {
-      var oldLayers = <OpacityLayer>[
-        if (layer != null) layer as OpacityLayer,
-        ..._opacityLayer
-      ];
-      var newLayers = <OpacityLayer>[];
       var i = 0;
+      var first = true;
       for (final e in list) {
-        newLayers.add(context.pushOpacity(offset, e.value,
+        OpacityLayer? oldLayer;
+        LayerHandle<OpacityLayer>? handle;
+        if (first) {
+          oldLayer = layer as OpacityLayer?;
+          handle = null;
+        } else {
+          if (_opacityLayer.length > i) {
+            handle = _opacityLayer[i];
+            oldLayer = handle.layer;
+          } else {
+            _opacityLayer.add(handle = LayerHandle());
+            oldLayer = null;
+          }
+          i++;
+        }
+        final newLayer = context.pushOpacity(offset, e.value,
             (context, offset) => paintSingleChild(e.key!, context, offset),
-            oldLayer: oldLayers.length > i ? oldLayers[i] : null));
-        i++;
+            oldLayer: oldLayer);
+        if (handle == null) {
+          layer = newLayer;
+        } else {
+          handle.layer = newLayer;
+        }
+        first = false;
       }
-      layer = newLayers[0];
-      newLayers.removeAt(0);
-      _opacityLayer = newLayers;
+      _disposeLayers(i);
     }
 
     if (_resizeChildrenWhenAnimating ||
@@ -306,14 +283,21 @@ class _MorphRenderStack extends RenderStack {
   void performLayout() {
     super.performLayout();
 
+    var maxV = 0.0;
+    for (var child = firstChild; child != null; child = childAfter(child)) {
+      final av = _getAnimationOf(child).value;
+      maxV = math.max(maxV, av);
+    }
+
     var width = 0.0, height = 0.0;
     var tot = 0.0;
     for (var child = firstChild; child != null; child = childAfter(child)) {
-      final v = _getAnimationOf(child).value;
+      final v = maxV == 0 ? 1.0 : _getAnimationOf(child).value / maxV;
       width += child.size.width * v;
       height += child.size.height * v;
       tot += v;
     }
+
     width /= tot;
     height /= tot;
 
@@ -340,29 +324,37 @@ class _MorphRenderStack extends RenderStack {
     size = Size(width, height);
   }
 
+  void _disposeLayers(int from) {
+    for (var i = from; i < _opacityLayer.length; i++) {
+      assert(_opacityLayer[i].layer != null);
+      _opacityLayer[i].layer = null;
+    }
+    _opacityLayer.removeRange(from, _opacityLayer.length);
+  }
+
+  @override
   void dispose() {
-    _animations.values.forEach((e) {
-      e.dispose();
-    });
+    _animations.values.forEach((e) => e.dispose());
     _animations.clear();
     _paintRenderObjects.clear();
-    _opacityLayer.clear();
+    _disposeLayers(0);
+    super.dispose();
   }
 }
 
-class _MorphRenderObjectElement extends RenderObjectElement
+class MorphRenderObjectElement extends RenderObjectElement
     with TickerProviderMixin {
   final _list = LinkedList<_Entry>();
   Element? _topElement;
   final _removeList = <_Entry>[];
 
-  _MorphRenderObjectElement(MorphTransition widget) : super(widget);
+  MorphRenderObjectElement(MorphTransition widget) : super(widget);
 
   @override
   MorphTransition get widget => super.widget as MorphTransition;
 
   @override
-  _MorphRenderStack get renderObject => super.renderObject as _MorphRenderStack;
+  MorphRenderStack get renderObject => super.renderObject as MorphRenderStack;
 
   @override
   void insertRenderObjectChild(RenderBox child, _Entry? slot) {
@@ -428,8 +420,8 @@ class _MorphRenderObjectElement extends RenderObjectElement
 
     late Element topElement;
     if (reusedElement == null) {
-      _list.add(
-          _Entry(topElement = inflateWidget(widget.child, _list.lastOrNull)));
+      _list.add(_Entry(
+          topElement = updateChild(null, widget.child, _list.lastOrNull)!));
     } else {
       topElement = reusedElement;
     }
@@ -441,7 +433,7 @@ class _MorphRenderObjectElement extends RenderObjectElement
   }
 
   void _markToRemove(RenderBox child) {
-    var e = _list.where((e) => e.element.renderObject == child).first;
+    var e = _list.singleWhere((e) => e.element.renderObject == child);
     if (_removeList.contains(e)) return;
     _removeList.add(e);
     markNeedsBuild();
@@ -451,11 +443,14 @@ class _MorphRenderObjectElement extends RenderObjectElement
   void performRebuild() {
     super.performRebuild();
     if (_removeList.isNotEmpty) {
-      _removeList.forEach((e) {
-        _list.remove(e);
-        updateChild(e.element, null, null);
+      _removeList.removeWhere((e) {
+        if (_list.length > 1) {
+          _list.remove(e);
+          updateChild(e.element, null, null);
+          return true;
+        }
+        return false;
       });
-      _removeList.clear();
       renderObject._coordinateAnimations();
     }
   }
@@ -468,105 +463,12 @@ class _MorphRenderObjectElement extends RenderObjectElement
 
   @override
   void unmount() {
-    renderObject.dispose();
-    dispose();
     super.unmount();
+    dispose();
   }
 }
 
 class _Entry extends LinkedListEntry<_Entry> {
   final Element element;
   _Entry(this.element);
-}
-
-/// Animated arrow button.
-class ArrowButton extends StatefulWidget {
-  final bool expanded;
-  final void Function(bool expanded)? onTap;
-  final Duration duration;
-  final Curve curve;
-  final Icon icon;
-  final double turns;
-
-  ArrowButton({
-    Key? key,
-    this.expanded = false,
-    this.onTap,
-    this.curve = Curves.fastOutSlowIn,
-    this.duration = const Duration(milliseconds: 300),
-    this.icon = const Icon(Icons.keyboard_arrow_down),
-    this.turns = 0.5,
-  }) : super(key: key);
-
-  @override
-  _ArrowButtonState createState() => _ArrowButtonState();
-}
-
-class _ArrowButtonState extends State<ArrowButton>
-    with SingleTickerProviderStateMixin {
-  late Animation<double> _animation;
-  AnimationController? _controller;
-  bool _expanded = false;
-
-  @override
-  void didUpdateWidget(ArrowButton oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.curve != oldWidget.curve ||
-        widget.duration != oldWidget.duration ||
-        widget.icon != oldWidget.icon ||
-        widget.turns != oldWidget.turns) {
-      _controller?.dispose();
-      _initAnimation();
-    }
-    if (widget.expanded != _expanded) {
-      _expanded = widget.expanded;
-      _animate();
-    }
-  }
-
-  void _animate() {
-    if (_expanded) {
-      _controller!.forward();
-    } else {
-      _controller!.reverse();
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _expanded = widget.expanded;
-    _initAnimation();
-  }
-
-  void _initAnimation() {
-    _controller = AnimationController(vsync: this, duration: widget.duration);
-    Animation<double> curve =
-        CurvedAnimation(parent: _controller!, curve: widget.curve);
-    _animation = Tween(begin: 0.0, end: widget.turns).animate(curve);
-    if (_expanded) _controller!.value = 1.0;
-  }
-
-  @override
-  void dispose() {
-    _controller!.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: () {
-        setState(() {
-          _expanded = !_expanded;
-          _animate();
-          if (widget.onTap != null) widget.onTap!(_expanded);
-        });
-      },
-      icon: RotationTransition(
-        turns: _animation,
-        child: widget.icon,
-      ),
-    );
-  }
 }

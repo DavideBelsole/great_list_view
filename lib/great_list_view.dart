@@ -1,5 +1,5 @@
 library great_list_view;
 
-export 'src/core.dart';
-export 'src/tree_list_adapter.dart';
-export 'src/other_widgets.dart';
+export 'package:great_list_view/core/core.dart';
+export 'package:great_list_view/other/dispatcher.dart';
+export 'package:worker_manager/worker_manager.dart';

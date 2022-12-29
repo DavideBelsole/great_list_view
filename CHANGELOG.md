@@ -4,12 +4,12 @@ Initial alpha release. Includes `AnimatedSliverList`, `AnimatedListDiffDispatche
 
 ## [0.0.9] - 19-04-2021
 
-- Bug fixes
-- Null-safety support
+- Bug fixes;
+- Null-safety support.
 
 ## [0.0.10] - 17-05-2021
 
-- fixed worker_manager depedencies error
+- fixed worker_manager depedencies error.
 
 ## [0.1.0] - 07-09-2021
 
@@ -19,4 +19,10 @@ Initial alpha release. Includes `AnimatedSliverList`, `AnimatedListDiffDispatche
 - Removed changing animation in favor of implicit flutter animations: alternatively, the new widget MorphTransition has been introduced to create a cross-fade effect when item is changing its content;
 - Introduced the AnimatedSliverFixedExtentList, inspired by SliverFixedExtentList, to create a list with fixed size items;
 - Introduced the AnimatedListView, inspired by ListView, to create a list view faster, without necessarily using slivers;
-- Reordering now works even while the list is animating;
+- Reordering now works even while the list is animating.
+
+## [0.2.0] - 28-12-2022
+
+- Library has been revised and rewritten (again);
+- New feature: now, items can be moved with animations;
+- Library dependencies bug fixed.
