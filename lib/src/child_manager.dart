@@ -258,8 +258,8 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
     double? leadingScrollOffset,
     double? trailingScrollOffset,
   }) {
-    return renderObject.extrapolateMaxScrollOffset(firstIndex!, lastIndex!,
-        leadingScrollOffset!, trailingScrollOffset!, childCount);
+    return renderObject.extrapolateMaxScrollOffset(null, firstIndex!,
+        lastIndex!, leadingScrollOffset!, trailingScrollOffset!, childCount);
   }
 
   @override
@@ -901,7 +901,7 @@ class _Slot {
       s is _Slot && s.index == index && s.popUpList == popUpList;
 
   @override
-  int get hashCode => super.hashCode;
+  int get hashCode => popUpList.hashCode ^ index;
 
   @override
   String toString() => '($index,${popUpList?.debugId})';

@@ -937,7 +937,7 @@ class _IntervalManager with TickerProviderMixin {
   void dispose() {
     assert(debugAssertNotDisposed());
     list.whereType<_SubListInterval>().forEach((i) => i.subList.dispose());
-    listOfPopUps.clear();
+    _listOfPopUps.clear();
     animations.clear();
     updates.clear();
     list.dispose();

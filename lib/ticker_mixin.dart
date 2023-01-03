@@ -1,4 +1,4 @@
-library great_list_view.other;
+library ticker_mixin;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';

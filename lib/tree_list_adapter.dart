@@ -1,9 +1,9 @@
-library great_list_view.other;
+library tree_list_adapter;
 
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:great_list_view/core/core.dart'
+import 'package:great_list_view/great_list_view.dart'
     show AnimatedListController, AnimatedListView, AnimatedWidgetBuilderData;
 
 const int _kWindowSize = 80;

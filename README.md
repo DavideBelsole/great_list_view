@@ -41,7 +41,7 @@ Add this to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  great_list_view: ^0.2.0
+  great_list_view: ^0.2.0+2
 ```
 
 and run;
@@ -1337,8 +1337,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:great_list_view/great_list_view.dart';
-import 'package:great_list_view/other/tree_list_adapter.dart';
-import 'package:great_list_view/other/other_widgets.dart';
+import 'package:great_list_view/tree_list_adapter.dart';
+import 'package:great_list_view/other_widgets.dart';
 
 void main() {
   buildTree(rnd, root, 5, 3);
@@ -1710,3 +1710,9 @@ List<ItemData> myList = [
 final scrollController = ScrollController();
 final controller = AnimatedListController();
 ```
+
+<b>
+Anyone who likes this library can support me by making a donation at will. This will definitely motivate me and push me to bring this library to its completion. I will greatly appreciate your contribution.
+</b>
+
+[![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=EJLUKSHKXMTNQ)

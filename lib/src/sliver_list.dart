@@ -1102,9 +1102,10 @@ class AnimatedRenderSliverList extends AnimatedRenderSliverMultiBoxAdaptor {
       outside = true;
     } else if (buildIndex > indexOf(list.lastChild!)) {
       // bottom
-      final pd = parentDataOf(list.lastChild!)!;
-      firstBuildIndex = pd.index! + 1;
-      scrollOffset = pd.layoutOffset! + paintExtentOf(list.lastChild!);
+      final lastParentData = parentDataOf(list.lastChild!)!;
+      firstBuildIndex = lastParentData.index! + 1;
+      scrollOffset =
+          lastParentData.layoutOffset! + paintExtentOf(list.lastChild!);
       if (childCount == firstBuildIndex) {
         value = _Measure(scrollOffset);
       } else {
@@ -1112,12 +1113,13 @@ class AnimatedRenderSliverList extends AnimatedRenderSliverMultiBoxAdaptor {
         if (popUpList == null) {
           size = geometry!.scrollExtent - scrollOffset;
         } else {
+          final firstParentData = parentDataOf(list.firstChild!)!;
           // For popups you can only estimate the size
           size = extrapolateMaxScrollOffset(
                   popUpList,
-                  firstBuildIndex,
-                  lastBuildIndex - 1,
-                  parentDataOf(list.firstChild!)!.layoutOffset!,
+                  firstParentData.index!,
+                  lastParentData.index!,
+                  firstParentData.layoutOffset!,
                   scrollOffset,
                   childCount) -
               scrollOffset;

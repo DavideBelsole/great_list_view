@@ -1,6 +1,6 @@
 name: great_list_view
 description: A Flutter package that enhance the standard list view with implicit animations on changes and so on. See README.md file.
-version: 0.2.0+1
+version: 0.2.0+2
 homepage: https://github.com/DavideBelsole/great_list_view.git
 repository: https://github.com/DavideBelsole/great_list_view.git
 
@@ -19,7 +19,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   pedantic: ^1.9.0
-
+  
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

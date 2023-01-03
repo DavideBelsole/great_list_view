@@ -1,5 +1,3 @@
-library great_list_view.core;
-
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io' as io;
@@ -11,10 +9,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:great_list_view/other/dispatcher.dart';
-import 'package:great_list_view/other/morph_transition.dart'
+import 'package:great_list_view/src/dispatcher.dart';
+import 'package:great_list_view/src/morph_transition.dart'
     show MorphComparator, MorphTransition;
-import 'package:great_list_view/other/ticker_mixin.dart';
+import 'package:great_list_view/ticker_mixin.dart';
 
 part 'animation.dart';
 part 'child_manager.dart';

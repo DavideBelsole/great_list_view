@@ -1,5 +1,3 @@
-library great_list_view.other;
-
 import 'dart:collection';
 import 'dart:math' as math;
 
@@ -7,7 +5,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-import 'ticker_mixin.dart';
+import '../../ticker_mixin.dart';
 
 typedef MorphComparator = bool Function(Widget a, Widget b);
 

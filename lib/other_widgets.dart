@@ -1,4 +1,4 @@
-library great_list_view.other;
+library other_widgets;
 
 import 'package:flutter/material.dart';
 

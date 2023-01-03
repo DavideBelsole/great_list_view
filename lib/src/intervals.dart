@@ -39,11 +39,11 @@ abstract class _Interval extends _LinkedNode<_Interval> {
 
   int? _buildOffset, _itemOffset;
 
-  static var _COUNTER = 0;
+  static var _counter = 0;
 
   final int _debugId;
 
-  _Interval() : _debugId = ++_COUNTER;
+  _Interval() : _debugId = ++_counter;
   _Interval.id(int id) : _debugId = id;
 
   /// It returns `true` if the [buildOffset] or [itemOffset] has not yet been calculated, or is no longer valid.
