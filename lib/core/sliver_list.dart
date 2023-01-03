@@ -60,12 +60,13 @@ abstract class AnimatedRenderSliverMultiBoxAdaptor
   }
 
   /// Calculates an estimate of the maximum scroll offset.
-  double? extrapolateMaxScrollOffset(
-    final int firstIndex,
-    final int lastIndex,
-    final double leadingScrollOffset,
-    final double trailingScrollOffset,
-    final int childCount,
+  double extrapolateMaxScrollOffset(
+    _PopUpList? popUpList,
+    int firstIndex,
+    int lastIndex,
+    double leadingScrollOffset,
+    double trailingScrollOffset,
+    int childCount,
   );
 
   /// The specified interval has been resized by a delta amount.
@@ -102,7 +103,7 @@ abstract class AnimatedRenderSliverMultiBoxAdaptor
     }
     var size = 0.0;
     for (var i = from; i < to; i++) {
-      size += childSize(child!);
+      size += paintExtentOf(child!);
       child = childAfter(child);
     }
     return _SizeResult(from, to, size);
@@ -150,16 +151,6 @@ abstract class AnimatedRenderSliverMultiBoxAdaptor
       child = childAfter(child);
     }
     return null;
-  }
-
-  /// Returns the size of the [child] according to the main direction (see [SliverConstraints.axis]).
-  double childSize(RenderBox child) {
-    switch (constraints.axis) {
-      case Axis.horizontal:
-        return child.size.width;
-      case Axis.vertical:
-        return child.size.height;
-    }
   }
 
   MultiSliverMultiBoxAdaptorParentData? parentDataOf(RenderBox? child) =>
@@ -236,7 +227,7 @@ abstract class AnimatedRenderSliverMultiBoxAdaptor
       _dbgBegin('structure of $popUpList');
       var c = listOf(popUpList)?.firstChild;
       while (c != null) {
-        _dbgPrint('${debugRenderBox(c)}: size=${childSize(c)}');
+        _dbgPrint('${debugRenderBox(c)}: size=${paintExtentOf(c)}');
         c = childAfter(c);
       }
       _dbgEnd();
@@ -288,130 +279,7 @@ abstract class AnimatedRenderSliverMultiBoxAdaptor
   BoxConstraints get childConstraints;
 
   _Measure estimateLayoutOffset(int buildIndex, int childCount, double? time,
-      _MovingPopUpList? popUpList) {
-    assert(!intervalManager.hasPendingUpdates);
-    final list = listOf(popUpList)!;
-
-    late int firstBuildIndex, lastBuildIndex;
-    late double size, pos, count, leadingScrollOffset;
-    late _Measure value;
-    var outside = false;
-    if (buildIndex == 0) {
-      value = _Measure.zero;
-    } else if (buildIndex == childCount && popUpList == null) {
-      value = _Measure(geometry!.scrollExtent);
-    } else if (buildIndex < indexOf(list.firstChild!)) {
-      // above
-      firstBuildIndex = 0;
-      lastBuildIndex = indexOf(list.firstChild!);
-      leadingScrollOffset = 0.0;
-      size = parentDataOf(list.firstChild!)!.layoutOffset!;
-      count = lastBuildIndex.toDouble();
-      pos = buildIndex.toDouble();
-      outside = true;
-    } else if (buildIndex > indexOf(list.lastChild!)) {
-      // bottom
-      firstBuildIndex = indexOf(list.lastChild!) + 1;
-      lastBuildIndex = childCount;
-      leadingScrollOffset = parentDataOf(list.lastChild!)!.layoutOffset! +
-          childSize(list.lastChild!);
-      if (childCount == firstBuildIndex) {
-        value = _Measure(leadingScrollOffset);
-      } else {
-        if (popUpList == null) {
-          size = geometry!.scrollExtent - leadingScrollOffset;
-        } else {
-          // For popups you can only estimate
-          var list = popUpList.intervals;
-          var sz = 0.0, sza = 0.0, aca = 0.0;
-          var cnt = 0, cnta = 0;
-          var bi = 0;
-          for (final i in list) {
-            if (i is _SpaceInterval) {
-              sz += i.currentSize;
-              if (bi < firstBuildIndex) {
-                sza += i.currentSize;
-                aca += i.averageCount;
-              }
-            } else {
-              cnt += i.buildCount;
-              if (bi < firstBuildIndex) {
-                cnta += math.min(i.buildCount, firstBuildIndex - bi);
-              }
-            }
-            bi += i.buildCount;
-          }
-          size = sz - sza;
-          final cntb = cnt - cnta;
-          if (cnta > 0) {
-            if (cntb > 0) {
-              size += (leadingScrollOffset - sza) * cntb / cnta;
-            }
-          } else {
-            size += sza * cntb / aca;
-          }
-        }
-        count = (childCount - firstBuildIndex).toDouble();
-        pos = (buildIndex - firstBuildIndex).toDouble();
-        outside = true;
-      }
-    } else {
-      // inner
-      var child = list.firstChild;
-      while (child != null) {
-        if (indexOf(child) == buildIndex) {
-          value = parentDataOf(child)!.layoutOffset!.toExactMeasure();
-          break;
-        }
-        child = childAfter(child);
-      }
-    }
-    if (outside) {
-      var bi = 0;
-      Iterable<_Interval> list;
-      if (popUpList == null) {
-        list = intervalManager.list;
-      } else {
-        list = popUpList.subLists.expand((e) => e);
-      }
-      for (final interval in list) {
-        if (bi >= firstBuildIndex) {
-          if (bi >= lastBuildIndex) break;
-          if (interval is _SpaceInterval) {
-            if (bi < buildIndex) {
-              leadingScrollOffset += interval.currentSize;
-            }
-            count--;
-            size -= interval.currentSize;
-          }
-        }
-        bi += interval.buildCount;
-      }
-      if (count > 0) leadingScrollOffset += (pos * size) / count;
-      value = _Measure(leadingScrollOffset);
-      assert(value.value.isFinite);
-    }
-    if (time != null) {
-      var adjust = 0.0;
-      Iterable<_Interval> list;
-      if (popUpList == null) {
-        list = intervalManager.list;
-      } else {
-        list = popUpList.subLists.expand((e) => e);
-      }
-      var bi = 0;
-      for (final i in list) {
-        if (bi >= buildIndex) break;
-        if (i is _AnimatedSpaceInterval) {
-          adjust += i.futureSize(time) - i.currentSize;
-        }
-        bi += i.buildCount;
-      }
-      value += adjust.toExactMeasure();
-    }
-    if (popUpList != null) value += _Measure(popUpList.currentScrollOffset!);
-    return value;
-  }
+      _MovingPopUpList? popUpList);
 
   Rect? computeItemBox(int itemIndex, bool absolute, bool avoidMeasuring);
 
@@ -444,7 +312,7 @@ abstract class AnimatedRenderSliverMultiBoxAdaptor
     final childOffset = parentDataOf(child)?.layoutOffset;
     if (childOffset == null) return false;
 
-    final itemSize = childSize(child);
+    final itemSize = paintExtentOf(child);
 
     final offset = buildIndex - interval.buildOffset;
     final itemIndex = interval.itemOffset + offset;
@@ -558,7 +426,7 @@ abstract class AnimatedRenderSliverMultiBoxAdaptor
     for (child = lastChild; child != null; child = childBefore(child)) {
       final childParentData = parentDataOf(child)!;
       final childGoalLine =
-          childParentData.layoutOffset! + childSize(child) * 0.75;
+          childParentData.layoutOffset! + paintExtentOf(child) * 0.75;
 
       if (draggedChildBottom > childGoalLine) {
         final buildIndex = childParentData.index!;
@@ -579,7 +447,7 @@ abstract class AnimatedRenderSliverMultiBoxAdaptor
     for (child = firstChild; child != null; child = childAfter(child)) {
       final childParentData = parentDataOf(child)!;
       final childGoalLine =
-          childParentData.layoutOffset! + childSize(child) * 0.25;
+          childParentData.layoutOffset! + paintExtentOf(child) * 0.25;
 
       if (draggedChildTop < childGoalLine) {
         final buildIndex = childParentData.index!;
@@ -1144,19 +1012,20 @@ class AnimatedRenderSliverList extends AnimatedRenderSliverMultiBoxAdaptor {
     childManager.disposableElement(widget, (renderBox) {
       renderBox.layout(childConstraints ?? this.childConstraints,
           parentUsesSize: true);
-      size = childSize(renderBox);
+      size = paintExtentOf(renderBox);
     });
     return size;
   }
 
   /// Estimates the max scroll offset based on the rendered viewport data.
   @override
-  double? extrapolateMaxScrollOffset(
-    final int firstIndex,
-    final int lastIndex,
-    final double leadingScrollOffset,
-    final double trailingScrollOffset,
-    final int childCount,
+  double extrapolateMaxScrollOffset(
+    _PopUpList? popUpList,
+    int firstIndex,
+    int lastIndex,
+    double leadingScrollOffset,
+    double trailingScrollOffset,
+    int childCount,
   ) {
     assert(!intervalManager.hasPendingUpdates);
 
@@ -1164,28 +1033,30 @@ class AnimatedRenderSliverList extends AnimatedRenderSliverMultiBoxAdaptor {
       return trailingScrollOffset;
     }
 
+    final ilist = popUpList?.intervals ?? intervalManager.list;
+
     var averageTrailingCount = 0.0;
     var innerCount = 0, trailingCount = 0, leadingCount = 0;
     var buildIndex = 0;
     var averageInnerCount = 0.0;
-    for (final interval in intervalManager.list) {
-      if (interval is _SpaceInterval) {
-        if (firstIndex <= buildIndex) {
+    for (final i in ilist) {
+      if (i is _SpaceInterval) {
+        if (buildIndex >= firstIndex) {
           if (buildIndex <= lastIndex) {
             // resizing intervals inside the viewport
             innerCount++;
-            averageInnerCount += interval.averageCount;
+            averageInnerCount += i.averageCount;
           } else {
             // resizing intervals outside/after the viewport
             trailingCount++;
-            averageTrailingCount += interval.averageCount;
+            averageTrailingCount += i.averageCount;
           }
         } else {
           leadingCount++;
-          averageInnerCount += interval.averageCount;
+          averageInnerCount += i.averageCount;
         }
       }
-      buildIndex += interval.buildCount;
+      buildIndex += i.buildCount;
     }
 
     var ret = trailingScrollOffset;
@@ -1199,6 +1070,109 @@ class AnimatedRenderSliverList extends AnimatedRenderSliverMultiBoxAdaptor {
     }
 
     return ret;
+  }
+
+  @override
+  _Measure estimateLayoutOffset(int buildIndex, int childCount, double? time,
+      _MovingPopUpList? popUpList) {
+    assert(!intervalManager.hasPendingUpdates);
+    assert(buildIndex >= 0 && buildIndex <= childCount);
+    final list = listOf(popUpList)!;
+
+    late int firstBuildIndex, lastBuildIndex /* exclueded */;
+    late double size, scrollOffset;
+    late int count, offset;
+    late _Measure value;
+    Iterable<_Interval>? ilist;
+    var outside = false;
+    if (buildIndex == 0) {
+      value = _Measure.zero;
+      time = null;
+    } else if (buildIndex == childCount && popUpList == null) {
+      value = _Measure(geometry!.scrollExtent);
+    } else if (buildIndex < indexOf(list.firstChild!)) {
+      // above
+      final pd = parentDataOf(list.firstChild!)!;
+      firstBuildIndex = 0;
+      lastBuildIndex = pd.index!;
+      scrollOffset = 0.0;
+      size = pd.layoutOffset!;
+      count = lastBuildIndex;
+      offset = buildIndex;
+      outside = true;
+    } else if (buildIndex > indexOf(list.lastChild!)) {
+      // bottom
+      final pd = parentDataOf(list.lastChild!)!;
+      firstBuildIndex = pd.index! + 1;
+      scrollOffset = pd.layoutOffset! + paintExtentOf(list.lastChild!);
+      if (childCount == firstBuildIndex) {
+        value = _Measure(scrollOffset);
+      } else {
+        lastBuildIndex = childCount;
+        if (popUpList == null) {
+          size = geometry!.scrollExtent - scrollOffset;
+        } else {
+          // For popups you can only estimate the size
+          size = extrapolateMaxScrollOffset(
+                  popUpList,
+                  firstBuildIndex,
+                  lastBuildIndex - 1,
+                  parentDataOf(list.firstChild!)!.layoutOffset!,
+                  scrollOffset,
+                  childCount) -
+              scrollOffset;
+        }
+        count = childCount - firstBuildIndex;
+        offset = buildIndex - firstBuildIndex;
+        outside = true;
+      }
+    } else {
+      // inner
+      var child = list.firstChild;
+      while (child != null) {
+        if (indexOf(child) == buildIndex) {
+          value = parentDataOf(child)!.layoutOffset!.toExactMeasure();
+          break;
+        }
+        child = childAfter(child);
+      }
+      assert(child != null);
+    }
+    if (outside) {
+      var bi = 0;
+      ilist ??=
+          (popUpList == null) ? intervalManager.list : popUpList.intervals;
+      for (final i in ilist) {
+        if (bi >= firstBuildIndex) {
+          if (bi >= lastBuildIndex) break;
+          if (i is _SpaceInterval) {
+            final csz = i.currentSize;
+            if (bi < buildIndex) scrollOffset += csz;
+            count--;
+            size -= csz;
+          }
+        }
+        bi += i.buildCount;
+      }
+      if (count > 0) scrollOffset += (offset * size) / count;
+      value = _Measure(scrollOffset, true);
+    }
+    if (time != null) {
+      var bi = 0, adjust = 0.0;
+      ilist ??=
+          (popUpList == null) ? intervalManager.list : popUpList.intervals;
+      for (final i in ilist) {
+        if (bi >= buildIndex) break;
+        if (i is _AnimatedSpaceInterval) {
+          adjust += i.futureSize(time) - i.currentSize;
+        }
+        bi += i.buildCount;
+      }
+      value += adjust.toExactMeasure();
+    }
+    if (popUpList != null) value += _Measure(popUpList.currentScrollOffset!);
+    assert(value.value.isFinite);
+    return value;
   }
 
   @override
@@ -1228,7 +1202,7 @@ class AnimatedRenderSliverList extends AnimatedRenderSliverMultiBoxAdaptor {
       if (widget == null) return null;
       s = measureItem(widget);
     } else {
-      s = childSize(firstChild!);
+      s = paintExtentOf(firstChild!);
       final parentData = parentDataOf(firstChild)!;
       var i = parentData.index!;
       r = parentData.layoutOffset!;
@@ -1251,7 +1225,7 @@ class AnimatedRenderSliverList extends AnimatedRenderSliverMultiBoxAdaptor {
           i = parentData.index!;
           r = parentData.layoutOffset!;
         }
-        s = childSize(child!);
+        s = paintExtentOf(child!);
         if (buildIndex > i) {
           if (avoidMeasuring) return null;
           i++;
@@ -1338,28 +1312,28 @@ class AnimatedRenderSliverFixedExtentList
       _SizeResult(buildFrom, buildTo, (buildTo - buildFrom) * itemExtent);
 
   @override
-  double? extrapolateMaxScrollOffset(
-    final int firstIndex,
-    final int lastIndex,
-    final double leadingScrollOffset,
-    final double trailingScrollOffset,
-    final int childCount,
+  double extrapolateMaxScrollOffset(
+    _PopUpList? popUpList,
+    int firstIndex,
+    int lastIndex,
+    double leadingScrollOffset,
+    double trailingScrollOffset,
+    int childCount,
   ) {
     assert(!intervalManager.hasPendingUpdates);
 
     if (lastIndex == childCount - 1) return trailingScrollOffset;
 
+    final ilist = popUpList?.intervals ?? intervalManager.list;
+
     var trailingSpace = 0.0;
     var trailingCount = 0;
     var buildIndex = 0;
-    for (final interval in intervalManager.list) {
+    for (final interval in ilist) {
       if (interval is _SpaceInterval) {
-        final si = interval;
-        if (firstIndex <= buildIndex) {
-          if (buildIndex > lastIndex) {
-            trailingCount++;
-            trailingSpace += si.currentSize;
-          }
+        if (buildIndex > lastIndex) {
+          trailingCount++;
+          trailingSpace += interval.currentSize;
         }
       }
       buildIndex += interval.buildCount;
@@ -1379,13 +1353,13 @@ class AnimatedRenderSliverFixedExtentList
       Iterable<_Interval> list, double itemExtent, int index) {
     var bi = 0, n = 0;
     var sz = 0.0;
-    for (final interval in list) {
+    for (final i in list) {
       if (index <= bi) break;
-      if (interval is _SpaceInterval) {
-        sz += interval.currentSize;
+      if (i is _SpaceInterval) {
+        sz += i.currentSize;
         n++;
       }
-      bi += interval.buildCount;
+      bi += i.buildCount;
     }
     return sz + itemExtent * (index - n);
   }
@@ -1394,8 +1368,8 @@ class AnimatedRenderSliverFixedExtentList
       SliverConstraints constraints, double itemExtent) {
     var count = childManager.childCount;
     var sz = 0.0;
-    for (final interval in intervalManager.list.whereType<_SpaceInterval>()) {
-      sz += interval.currentSize;
+    for (final i in intervalManager.list.whereType<_SpaceInterval>()) {
+      sz += i.currentSize;
       count--;
     }
     return sz + itemExtent * count;
@@ -1698,6 +1672,31 @@ class AnimatedRenderSliverFixedExtentList
         minExtent: itemExtent,
         maxExtent: itemExtent,
       );
+
+  @override
+  _Measure estimateLayoutOffset(int buildIndex, int childCount, double? time,
+      _MovingPopUpList? popUpList) {
+    assert(!intervalManager.hasPendingUpdates);
+    assert(buildIndex >= 0 && buildIndex <= childCount);
+    final ilist =
+        (popUpList == null) ? intervalManager.list : popUpList.intervals;
+    var value =
+        indexToLayoutOffset(ilist, itemExtent, buildIndex).toExactMeasure();
+    if (time != null) {
+      var bi = 0, adjust = 0.0;
+      for (final i in ilist) {
+        if (bi >= buildIndex) break;
+        if (i is _AnimatedSpaceInterval) {
+          adjust += i.futureSize(time) - i.currentSize;
+        }
+        bi += i.buildCount;
+      }
+      value += adjust.toExactMeasure();
+    }
+    if (popUpList != null) value += _Measure(popUpList.currentScrollOffset!);
+    assert(value.value.isFinite);
+    return value;
+  }
 
   @override
   Rect? computeItemBox(int buildIndex, bool absolute, bool _) {
