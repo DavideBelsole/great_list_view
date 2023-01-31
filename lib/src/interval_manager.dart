@@ -910,25 +910,21 @@ class _IntervalManager with TickerProviderMixin {
 
   _ControlledAnimation _createAnimation(AnimatedListAnimationData data) {
     assert(debugAssertNotDisposed());
-    final animation = _ControlledAnimation(
-      this,
-      data.animation,
-      data.duration,
-      startTime: data.startTime,
-      onDispose: (a) => animations.remove(a),
-    );
-    animations.add(animation);
-    animation.addListener(() {
-      // when the animation is complete it notifies all its linked intervals
-      if (animation.intervals.isNotEmpty) {
-        animation.intervals.toList().forEach((i) {
-          if (i.areAnimationsCompleted && !i.isDisposed && i.list != null) {
-            onIntervalCompleted(i);
+    final animation = _ControlledAnimation(this, data.animation, data.duration,
+        startTime: data.startTime,
+        onDispose: (a) => animations.remove(a),
+        onCompleted: (a) {
+          // when the animation is complete it notifies all its linked intervals
+          if (a.intervals.isNotEmpty) {
+            a.intervals.toList().forEach((i) {
+              if (i.areAnimationsCompleted && !i.isDisposed && i.list != null) {
+                onIntervalCompleted(i);
+              }
+            });
+            coordinate();
           }
         });
-        coordinate();
-      }
-    });
+    animations.add(animation);
     return animation;
   }
 

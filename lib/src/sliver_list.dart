@@ -160,7 +160,6 @@ abstract class AnimatedRenderSliverMultiBoxAdaptor
   /// (ie a [Scrollbar]) to refresh its state.
   void _notifyScrollable() {
     final scrollable = Scrollable.of(childManager);
-    if (scrollable == null) return;
     final controller = scrollable.widget.controller;
     if (controller == null || !controller.hasClients) return;
     ScrollUpdateNotification(
@@ -391,7 +390,7 @@ abstract class AnimatedRenderSliverMultiBoxAdaptor
     });
 
     // scroll up/down as needed while dragging
-    var controller = Scrollable.of(childManager)?.widget.controller;
+    var controller = Scrollable.of(childManager).widget.controller;
     if (controller != null) {
       final position = controller.position;
       final delta = _reorderLayoutData!.computeScrollDelta(

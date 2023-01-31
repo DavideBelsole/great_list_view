@@ -44,14 +44,10 @@ class _DismissedAnimation extends _IntervalAnimation {
   double futureValue(double time) => 0;
 }
 
-class _ControlledAnimation extends _IntervalAnimation with ChangeNotifier {
-  _ControlledAnimation(
-    TickerProvider vsync,
-    this.animatable,
-    Duration duration, {
-    double startTime = 0.0,
-    this.onDispose,
-  })  : assert(startTime >= 0.0 && startTime <= 1.0),
+class _ControlledAnimation extends _IntervalAnimation {
+  _ControlledAnimation(TickerProvider vsync, this.animatable, Duration duration,
+      {double startTime = 0.0, this.onDispose, this.onCompleted})
+      : assert(startTime >= 0.0 && startTime <= 1.0),
         _controller = AnimationController(
           value: startTime,
           vsync: vsync,
@@ -64,6 +60,7 @@ class _ControlledAnimation extends _IntervalAnimation with ChangeNotifier {
   final AnimationController _controller;
   final intervals = <_AnimatedIntervalMixin>{};
   final void Function(_ControlledAnimation a)? onDispose;
+  final void Function(_ControlledAnimation a)? onCompleted;
 
   bool _disposed = false;
   late Animation<double> _animation;
@@ -136,7 +133,7 @@ class _ControlledAnimation extends _IntervalAnimation with ChangeNotifier {
 
   void _onCompleted() {
     if (!_disposed) {
-      notifyListeners();
+      onCompleted?.call(this);
     }
   }
 
