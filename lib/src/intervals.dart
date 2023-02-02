@@ -1497,7 +1497,12 @@ class _ReadyToPopupMoveInterval extends _Interval
         dropInterval.invalidate();
       },
       updateCallback: (list, index, oldBuildCount, newBuildCount) {
-        list.manager.addUpdate(index, oldBuildCount, newBuildCount);
+        list.manager.addUpdate(
+          index,
+          oldBuildCount,
+          newBuildCount,
+          popUpList: list.popUpList,
+        );
       },
     );
   }
@@ -1534,6 +1539,7 @@ class _MovingInterval extends _AnimatedSpaceInterval
       : super(animation, _Measure.zero, toSize, 0.0, subList.itemCount) {
     assert(popUpList.subLists.isEmpty);
     popUpList.subLists.add(subList);
+    popUpList.lastBuildCount = subList.buildCount;
     popUpList.updateScrollOffset = updateToOffset;
     popUpList.currentScrollOffset = startingScrollOffset;
 
@@ -1712,7 +1718,12 @@ class _MovingInterval extends _AnimatedSpaceInterval
         invalidate();
       },
       updateCallback: (list, index, oldBuildCount, newBuildCount) {
-        list.manager.addUpdate(index, oldBuildCount, newBuildCount);
+        list.manager.addUpdate(
+          index,
+          oldBuildCount,
+          newBuildCount,
+          popUpList: list.popUpList,
+        );
       },
     );
   }
@@ -1870,8 +1881,8 @@ mixin _SplitMixin implements _Interval {
     final buildCounts = splitCounts(leading, middleItemCount, trailing);
     return _SplitResult(
       _createSplitInterval(buildCounts.left, leading, 0)?.iterable(),
-      _createSplitInterval(
-              buildCounts.right, trailing, buildCounts.left + buildCounts.right)
+      _createSplitInterval(buildCounts.right, trailing,
+              buildCounts.left + buildCounts.middle)
           ?.iterable(),
       createMiddle
           ? _createSplitInterval(
@@ -1880,7 +1891,8 @@ mixin _SplitMixin implements _Interval {
           : middle,
       updateCallback: (list, index, oldBuildCount, newBuildCount) {
         if (forceRebuild) {
-          list.manager.addUpdate(index, oldBuildCount, newBuildCount);
+          list.manager.addUpdate(index, oldBuildCount, newBuildCount,
+              popUpList: list.popUpList);
         }
         if (!createMiddle) {
           middleUpdateCallback?.call(list, index + buildCounts.left,

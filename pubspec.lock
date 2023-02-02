@@ -180,10 +180,10 @@ packages:
     dependency: "direct main"
     description:
       name: worker_manager
-      sha256: "4d385b0f741745e6b4f5492d39423963c462ce45ea6f0107668bb08a1ffc8a21"
+      sha256: "39a7f37dfc187145adc46ab94d08e7ca1c9468a2f4600a744b22842c83761cc5"
       url: "https://pub.dev"
     source: hosted
-    version: "4.5.1"
+    version: "5.0.0"
 sdks:
   dart: ">=2.18.0 <4.0.0"
   flutter: ">=2.0.6"

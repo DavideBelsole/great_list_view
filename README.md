@@ -41,7 +41,7 @@ Add this to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  great_list_view: ^0.2.1
+  great_list_view: ^0.2.2
 ```
 
 and run;

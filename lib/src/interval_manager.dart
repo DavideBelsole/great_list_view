@@ -18,8 +18,10 @@ class _IntervalManager with TickerProviderMixin {
 
   late _IntervalList list;
 
+  late int _lastBuildCount;
+
   _IntervalManager(this.interface) {
-    final initialCount = interface.delegate.initialChildCount;
+    final initialCount = _lastBuildCount = interface.delegate.initialChildCount;
     list = _IntervalList.normal(this, initialCount);
   }
 
@@ -422,17 +424,20 @@ class _IntervalManager with TickerProviderMixin {
 
     if (list.holder != null) {
       if (list.isEmpty) {
-        final holder = list.holder;
+        final holder = list.holder!;
+        final holderList = holder.list!;
         if (holder is _ReadyToMoveInterval) {
           assert(holder.itemCount == 0 && holder.buildCount == 0);
-          holder.list!.changed = true;
+          holderList.changed = true;
           holder.dropInterval._remove();
-          holder._remove();
+          holderList.remove(holder.iterable(),
+              updateCallback: _alwaysUpdateCallback);
         } else if (holder is _MovingInterval) {
           assert(holder.itemCount == 0);
-          holder.list!.changed = true;
+          holderList.changed = true;
           _listOfPopUps.remove(holder.popUpList);
-          holder._remove();
+          holderList.remove(holder.iterable(),
+              updateCallback: _alwaysUpdateCallback);
         }
       }
     }
@@ -908,6 +913,12 @@ class _IntervalManager with TickerProviderMixin {
     interface.markNeedsBuild();
   }
 
+  void clearUpdates() {
+    updates.clear();
+    _lastBuildCount = list.buildCount;
+    listOfPopUps.forEach((p) => p.lastBuildCount = p.popUpBuildCount);
+  }
+
   _ControlledAnimation _createAnimation(AnimatedListAnimationData data) {
     assert(debugAssertNotDisposed());
     final animation = _ControlledAnimation(this, data.animation, data.duration,
@@ -958,7 +969,7 @@ class _IntervalManager with TickerProviderMixin {
         return false;
       }
 
-      return true;
+      return debugUpdateConsistency();
     }());
     return true;
   }
@@ -972,6 +983,18 @@ class _IntervalManager with TickerProviderMixin {
         );
       }
       return true;
+    }());
+    return true;
+  }
+
+  bool debugUpdateConsistency() {
+    assert(() {
+      final delta = updates
+          .where((upd) => upd.popUpList == null || upd.flags.hasPopupDrop)
+          .fold<int>(
+              0, (pv, upd) => pv + upd.newBuildCount - upd.oldBuildCount);
+      return (_lastBuildCount + delta == list.buildCount) &&
+          listOfPopUps.every((pl) => pl.debugUpdateConsistency(updates));
     }());
     return true;
   }

@@ -358,7 +358,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
           }
           _currentlyUpdatingChildIndex = r.newIndex;
           _currentlyUpdatingPopUpList = r.popUpList;
-          final widget = build(r.newIndex!, popUpList: r.popUpList);
+          final widget = build(r.newIndex!, popUpList: r.popUpList)!;
           element =
               updateChild(element, widget, _Slot(r.newIndex!, r.popUpList))!;
           _currentlyUpdatingChildIndex = null;
@@ -478,7 +478,7 @@ class AnimatedSliverMultiBoxAdaptorElement extends RenderObjectElement
       _currentlyUpdatingChildIndex = null;
       _currentlyUpdatingPopUpList = null;
       renderObject.debugChildIntegrityEnabled = true;
-      _intervalListManager.updates.clear();
+      _intervalListManager.clearUpdates();
       // renderObject.removeEmptyKeys();
       _dbgEnd();
     }

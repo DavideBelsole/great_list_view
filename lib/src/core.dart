@@ -251,6 +251,20 @@ abstract class _PopUpList {
   void Function(double Function(int, int, double) callback)? updateScrollOffset;
 
   Iterable<_Interval> get intervals;
+
+  int get lastBuildCount;
+  set lastBuildCount(int v);
+
+  bool debugUpdateConsistency(List<_Update> updates) {
+    assert(() {
+      final delta = updates
+          .where((upd) => upd.popUpList == this && !upd.flags.hasPopupDrop)
+          .fold<int>(
+              0, (pv, upd) => pv + upd.newBuildCount - upd.oldBuildCount);
+      return lastBuildCount + delta == popUpBuildCount;
+    }());
+    return true;
+  }
 }
 
 class _ReorderPopUpList extends _PopUpList {
@@ -266,10 +280,13 @@ class _ReorderPopUpList extends _PopUpList {
   }
 
   @override
-  int get popUpBuildCount => 1;
+  int get popUpBuildCount => intervalList.buildCount;
 
   @override
   Iterable<_Interval> get intervals => intervalList;
+
+  @override
+  var lastBuildCount = 1;
 
   @override
   String toString() => 'PopUp[$debugId] reorder';
@@ -295,6 +312,9 @@ class _MovingPopUpList extends _PopUpList {
 
   @override
   Iterable<_Interval> get intervals => subLists.expand((e) => e);
+
+  @override
+  var lastBuildCount = 0;
 
   @override
   String toString() => 'PopUp[$debugId] subLists=$subLists';

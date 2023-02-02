@@ -27,6 +27,10 @@ Initial alpha release. Includes `AnimatedSliverList`, `AnimatedListDiffDispatche
 - New feature: now, items can be moved with animations;
 - Library dependencies bug fixed.
 
-## [0.2.1] - 31.02.2023
+## [0.2.1] - 31.01.2023
 
 - bug fix assertion '_notificationCallStackDepth == 0'
+
+## [0.2.2] - 02.02.2023
+
+- fixed several bugs, more stable version
