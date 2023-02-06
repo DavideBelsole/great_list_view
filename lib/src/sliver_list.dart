@@ -1034,38 +1034,28 @@ class AnimatedRenderSliverList extends AnimatedRenderSliverMultiBoxAdaptor {
 
     final ilist = popUpList?.intervals ?? intervalManager.list;
 
-    var averageTrailingCount = 0.0;
-    var innerCount = 0, trailingCount = 0, leadingCount = 0;
-    var buildIndex = 0;
+    var innerCount = 0, trailingCount = 0;
     var averageInnerCount = 0.0;
-    for (final i in ilist) {
-      if (i is _SpaceInterval) {
-        if (buildIndex >= firstIndex) {
-          if (buildIndex <= lastIndex) {
-            // resizing intervals inside the viewport
-            innerCount++;
-            averageInnerCount += i.averageCount;
-          } else {
-            // resizing intervals outside/after the viewport
-            trailingCount++;
-            averageTrailingCount += i.averageCount;
-          }
-        } else {
-          leadingCount++;
-          averageInnerCount += i.averageCount;
-        }
+    var trailingSize = 0.0;
+    for (final i in ilist.expandedIntervals.whereType<_SpaceInterval>()) {
+      if (i.actualBuildOffset > lastIndex) {
+        trailingCount++;
+        trailingSize += i.currentSize;
+      } else {
+        innerCount++;
+        averageInnerCount += i.averageCount;
       }
-      buildIndex += i.buildCount;
     }
 
-    var ret = trailingScrollOffset;
+    var ret = trailingScrollOffset + trailingSize;
 
     // # items outside/after the viewport, excluding resizing intervals
     final remainingCount = childCount - lastIndex - trailingCount - 1;
     if (remainingCount > 0) {
       final averageExtent = trailingScrollOffset /
-          (1 + lastIndex - innerCount - leadingCount + averageInnerCount);
-      ret += averageExtent * (remainingCount + averageTrailingCount);
+          (1 + lastIndex - innerCount + averageInnerCount);
+
+      ret += averageExtent * remainingCount;
     }
 
     return ret;
@@ -1140,21 +1130,22 @@ class AnimatedRenderSliverList extends AnimatedRenderSliverMultiBoxAdaptor {
       assert(child != null);
     }
     if (outside) {
-      var bi = 0;
       ilist ??=
           (popUpList == null) ? intervalManager.list : popUpList.intervals;
-      for (final i in ilist) {
+      for (final i in ilist.expandedIntervals.whereType<_SpaceInterval>()) {
+        final bi = i.actualBuildOffset;
         if (bi >= firstBuildIndex) {
           if (bi >= lastBuildIndex) break;
-          if (i is _SpaceInterval) {
-            final csz = i.currentSize;
-            if (bi < buildIndex) scrollOffset += csz;
-            count--;
-            size -= csz;
+          final csz = i.currentSize;
+          if (bi < buildIndex) {
+            scrollOffset += csz;
+            offset--;
           }
+          count--;
+          size -= csz;
         }
-        bi += i.buildCount;
       }
+      if (size < 0) size = 0;
       if (count > 0) scrollOffset += (offset * size) / count;
       value = _Measure(scrollOffset, true);
     }
@@ -1329,15 +1320,11 @@ class AnimatedRenderSliverFixedExtentList
 
     var trailingSpace = 0.0;
     var trailingCount = 0;
-    var buildIndex = 0;
-    for (final interval in ilist) {
-      if (interval is _SpaceInterval) {
-        if (buildIndex > lastIndex) {
-          trailingCount++;
-          trailingSpace += interval.currentSize;
-        }
+    for (final i in ilist.expandedIntervals.whereType<_SpaceInterval>()) {
+      if (i.actualBuildOffset > lastIndex) {
+        trailingCount++;
+        trailingSpace += i.currentSize;
       }
-      buildIndex += interval.buildCount;
     }
 
     var ret = trailingScrollOffset + trailingSpace;
@@ -1352,15 +1339,12 @@ class AnimatedRenderSliverFixedExtentList
 
   double indexToLayoutOffset(
       Iterable<_Interval> list, double itemExtent, int index) {
-    var bi = 0, n = 0;
+    var n = 0;
     var sz = 0.0;
-    for (final i in list) {
-      if (index <= bi) break;
-      if (i is _SpaceInterval) {
-        sz += i.currentSize;
-        n++;
-      }
-      bi += i.buildCount;
+    for (final i in list.expandedIntervals.whereType<_SpaceInterval>()) {
+      if (index <= i.actualBuildOffset) break;
+      sz += i.currentSize;
+      n++;
     }
     return sz + itemExtent * (index - n);
   }
@@ -1369,7 +1353,8 @@ class AnimatedRenderSliverFixedExtentList
       SliverConstraints constraints, double itemExtent) {
     var count = childManager.childCount;
     var sz = 0.0;
-    for (final i in intervalManager.list.whereType<_SpaceInterval>()) {
+    for (final i
+        in intervalManager.list.expandedIntervals.whereType<_SpaceInterval>()) {
       sz += i.currentSize;
       count--;
     }
@@ -1380,19 +1365,17 @@ class AnimatedRenderSliverFixedExtentList
       Iterable<_Interval> list, double scrollOffset, double itemExtent) {
     if (scrollOffset <= 0) return 0;
     var toOffset = 0.0, adjust = 0.0;
-    var bi = 0;
-    for (final interval in list) {
+    for (final interval in list.expandedIntervals) {
       if (interval is _SpaceInterval) {
         toOffset += interval.currentSize;
         if (scrollOffset < toOffset) {
-          return bi;
+          return interval.actualBuildOffset;
         }
         adjust += itemExtent - interval.currentSize;
       } else {
         toOffset += interval.buildCount * itemExtent;
         if (scrollOffset < toOffset) break;
       }
-      bi += interval.buildCount;
     }
     scrollOffset += adjust;
     if (itemExtent > 0.0) {
@@ -1410,19 +1393,17 @@ class AnimatedRenderSliverFixedExtentList
   int getMaxChildIndexForScrollOffset(
       Iterable<_Interval> list, double scrollOffset, double itemExtent) {
     var toOffset = 0.0, adjust = 0.0;
-    var bi = 0;
-    for (final interval in list) {
+    for (final interval in list.expandedIntervals) {
       if (interval is _SpaceInterval) {
         toOffset += interval.currentSize;
         if (scrollOffset < toOffset) {
-          return bi;
+          return interval.actualBuildOffset;
         }
         adjust += itemExtent - interval.currentSize;
       } else {
         toOffset += interval.buildCount * itemExtent;
         if (scrollOffset < toOffset) break;
       }
-      bi += interval.buildCount;
     }
     scrollOffset += adjust;
     if (itemExtent > 0.0) {
@@ -1684,13 +1665,12 @@ class AnimatedRenderSliverFixedExtentList
     var value =
         indexToLayoutOffset(ilist, itemExtent, buildIndex).toExactMeasure();
     if (time != null) {
-      var bi = 0, adjust = 0.0;
-      for (final i in ilist) {
+      var adjust = 0.0;
+      for (final i
+          in ilist.expandedIntervals.whereType<_AnimatedSpaceInterval>()) {
+        final bi = i.actualBuildOffset;
         if (bi >= buildIndex) break;
-        if (i is _AnimatedSpaceInterval) {
-          adjust += i.futureSize(time) - i.currentSize;
-        }
-        bi += i.buildCount;
+        adjust += i.futureSize(time) - i.currentSize;
       }
       value += adjust.toExactMeasure();
     }

@@ -152,9 +152,8 @@ class _IntervalList extends _LinkedList<_Interval>
 
     assert(debugDirtyConsistency());
 
-    final index = firstNewInterval.buildOffset;
-    updateCallback?.call(this, index + (holder?.parentBuildOffset ?? 0),
-        oldBuildCount, newBuildCount);
+    updateCallback?.call(
+        this, firstNewInterval.actualBuildOffset, oldBuildCount, newBuildCount);
 
     changed = true;
   }
@@ -186,9 +185,8 @@ class _IntervalList extends _LinkedList<_Interval>
 
     assert(debugDirtyConsistency());
 
-    final index = firstNewInterval.buildOffset;
     updateCallback?.call(
-        this, index + (holder?.parentBuildOffset ?? 0), 0, newBuildCount);
+        this, firstNewInterval.actualBuildOffset, 0, newBuildCount);
 
     changed = true;
   }
@@ -222,9 +220,8 @@ class _IntervalList extends _LinkedList<_Interval>
 
     assert(debugDirtyConsistency());
 
-    final index = firstNewInterval.buildOffset;
     updateCallback?.call(
-        this, index + (holder?.parentBuildOffset ?? 0), 0, newBuildCount);
+        this, firstNewInterval.actualBuildOffset, 0, newBuildCount);
 
     changed = true;
   }
@@ -473,9 +470,25 @@ class _IntervalList extends _LinkedList<_Interval>
     }());
     return true;
   }
+
+  void addUpdate(int index, int oldBuildCount, int newBuildCount,
+      {_UpdateFlags flags = const _UpdateFlags()}) {
+    manager.addUpdate(index, oldBuildCount, newBuildCount,
+        popUpList: popUpList, flags: flags);
+  }
 }
 
 extension _InterableIntervalExtension on Iterable<_Interval> {
   int get buildCount => fold<int>(0, (pv, i) => pv + i.buildCount);
   // int get itemCount => fold<int>(0, (pv, i) => pv + i.buildCount);
+
+  Iterable<_Interval> get expandedIntervals sync* {
+    for (final i in this) {
+      if (i is _ReadyToMoveInterval) {
+        yield* i.subList.expandedIntervals;
+      } else {
+        yield i;
+      }
+    }
+  }
 }

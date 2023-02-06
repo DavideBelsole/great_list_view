@@ -31,6 +31,6 @@ Initial alpha release. Includes `AnimatedSliverList`, `AnimatedListDiffDispatche
 
 - bug fix assertion '_notificationCallStackDepth == 0'
 
-## [0.2.2] - 02.02.2023
+## [0.2.2] to [0.2.3] - 02.02.2023
 
 - fixed several bugs, more stable version

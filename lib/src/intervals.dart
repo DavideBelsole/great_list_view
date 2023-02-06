@@ -88,6 +88,9 @@ abstract class _Interval extends _LinkedNode<_Interval> {
   int get nextBuildOffset => buildOffset + buildCount;
   int get nextItemOffset => itemOffset + itemCount;
 
+  int get actualBuildOffset =>
+      buildOffset + (list!.holder?.parentBuildOffset ?? 0);
+
   /// It marks this interval as dirty, i.e., reports the request to recalculate the [buildOffset] and
   /// [itemOffset] properties.
   void invalidate() {
@@ -764,8 +767,7 @@ class _ReadyToInsertionInterval extends _Interval
                 leftInterval.size + size, leftInterval.itemCount + itemCount)
             .iterable(),
         (list, index, oldBuildCount, newBuildCount) {
-          list.manager.addUpdate(index, oldBuildCount, newBuildCount,
-              popUpList: list.popUpList,
+          list.addUpdate(index, oldBuildCount, newBuildCount,
               flags: const _UpdateFlags(_UpdateFlags.CLEAR_LAYOUT_OFFSET |
                   _UpdateFlags.KEEP_FIRST_LAYOUT_OFFSET));
         },
@@ -1497,12 +1499,7 @@ class _ReadyToPopupMoveInterval extends _Interval
         dropInterval.invalidate();
       },
       updateCallback: (list, index, oldBuildCount, newBuildCount) {
-        list.manager.addUpdate(
-          index,
-          oldBuildCount,
-          newBuildCount,
-          popUpList: list.popUpList,
-        );
+        list.addUpdate(index, oldBuildCount, newBuildCount);
       },
     );
   }
@@ -1718,12 +1715,7 @@ class _MovingInterval extends _AnimatedSpaceInterval
         invalidate();
       },
       updateCallback: (list, index, oldBuildCount, newBuildCount) {
-        list.manager.addUpdate(
-          index,
-          oldBuildCount,
-          newBuildCount,
-          popUpList: list.popUpList,
-        );
+        list.addUpdate(index, oldBuildCount, newBuildCount);
       },
     );
   }
@@ -1841,7 +1833,7 @@ class _SplitBuildCounts {
 
 mixin _SplitMixin implements _Interval {
   _Interval? _createSplitInterval(int buildCount, int itemCount, int offset) {
-    if (itemCount == 0) return null;
+    if (itemCount == 0 && buildCount == 0) return null;
     return buildCount == 0
         ? _ReadyToResizingSpawnedInterval(itemCount)
         : createSplitInterval(buildCount, itemCount, offset);
@@ -1863,8 +1855,13 @@ mixin _SplitMixin implements _Interval {
     final leftBuildCount = math.min(leading, buildCount);
     var middleBuildCount =
         math.min(itemCount - trailing - leading, buildCount - leftBuildCount);
-    final rightBuildCount = buildCount - leftBuildCount - middleBuildCount;
-    if (trailing == 0) middleBuildCount += rightBuildCount;
+    final int rightBuildCount;
+    if (trailing == 0) {
+      rightBuildCount = 0;
+      middleBuildCount += buildCount - leftBuildCount - middleBuildCount;
+    } else {
+      rightBuildCount = buildCount - leftBuildCount - middleBuildCount;
+    }
     return _SplitBuildCounts(leftBuildCount, middleBuildCount, rightBuildCount);
   }
 
@@ -1891,8 +1888,7 @@ mixin _SplitMixin implements _Interval {
           : middle,
       updateCallback: (list, index, oldBuildCount, newBuildCount) {
         if (forceRebuild) {
-          list.manager.addUpdate(index, oldBuildCount, newBuildCount,
-              popUpList: list.popUpList);
+          list.addUpdate(index, oldBuildCount, newBuildCount);
         }
         if (!createMiddle) {
           middleUpdateCallback?.call(list, index + buildCounts.left,

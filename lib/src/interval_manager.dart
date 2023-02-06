@@ -387,7 +387,7 @@ class _IntervalManager with TickerProviderMixin {
 
   void _alwaysUpdateCallback(
       _IntervalList list, int index, int oldBuildCount, int newBuildCount) {
-    addUpdate(index, oldBuildCount, newBuildCount, popUpList: list.popUpList);
+    list.addUpdate(index, oldBuildCount, newBuildCount);
   }
 
   void performSplit(_Interval i, _SplitResult r) {
@@ -580,13 +580,13 @@ class _IntervalManager with TickerProviderMixin {
         interval.list!.replace(interval.iterable(), newInterval.iterable(),
             updateCallback: (_IntervalList list, int index, int oldBuildCount,
                 int newBuildCount) {
-          addUpdate(index, oldBuildCount, newBuildCount,
-              popUpList: list.popUpList,
-              flags: _UpdateFlags(_UpdateFlags.DISCARD_ELEMENT |
-                  _UpdateFlags.CLEAR_LAYOUT_OFFSET |
-                  (interval.fromSize!.estimated
-                      ? 0
-                      : _UpdateFlags.KEEP_FIRST_LAYOUT_OFFSET)));
+          list.addUpdate(index, oldBuildCount, newBuildCount,
+              flags: interval.fromSize!.estimated
+                  ? const _UpdateFlags(_UpdateFlags.DISCARD_ELEMENT |
+                      _UpdateFlags.CLEAR_LAYOUT_OFFSET)
+                  : const _UpdateFlags(_UpdateFlags.DISCARD_ELEMENT |
+                      _UpdateFlags.CLEAR_LAYOUT_OFFSET |
+                      _UpdateFlags.KEEP_FIRST_LAYOUT_OFFSET));
         });
         newInterval.startAnimation();
       });
@@ -603,13 +603,13 @@ class _IntervalManager with TickerProviderMixin {
         interval.list!.replace(interval.iterable(), newInterval.iterable(),
             updateCallback: (_IntervalList list, int index, int oldBuildCount,
                 int newBuildCount) {
-          addUpdate(index, oldBuildCount, newBuildCount,
-              popUpList: list.popUpList,
-              flags: _UpdateFlags(_UpdateFlags.DISCARD_ELEMENT |
-                  _UpdateFlags.CLEAR_LAYOUT_OFFSET |
-                  (interval.size.estimated
-                      ? 0
-                      : _UpdateFlags.KEEP_FIRST_LAYOUT_OFFSET)));
+          list.addUpdate(index, oldBuildCount, newBuildCount,
+              flags: interval.size.estimated
+                  ? const _UpdateFlags(_UpdateFlags.DISCARD_ELEMENT |
+                      _UpdateFlags.CLEAR_LAYOUT_OFFSET)
+                  : const _UpdateFlags(_UpdateFlags.DISCARD_ELEMENT |
+                      _UpdateFlags.CLEAR_LAYOUT_OFFSET |
+                      _UpdateFlags.KEEP_FIRST_LAYOUT_OFFSET));
         });
         newInterval.startAnimation();
       });
@@ -670,18 +670,17 @@ class _IntervalManager with TickerProviderMixin {
               addUpdate(r2mi.popUpList.buildIndexOf(r2mi.subList), count, count,
                   popUpList: r2mi.popUpList,
                   toPopUpList: movingInterval.popUpList,
-                  flags: _UpdateFlags(_UpdateFlags.POPUP_PICK));
+                  flags: const _UpdateFlags(_UpdateFlags.POPUP_PICK));
             } else {
               addUpdate(index, oldBuildCount, newBuildCount,
                   toPopUpList: movingInterval.popUpList,
-                  flags: _UpdateFlags(_UpdateFlags.POPUP_PICK));
+                  flags: const _UpdateFlags(_UpdateFlags.POPUP_PICK));
             }
           });
           resizeInterval.startAnimation();
           movingInterval.startAnimation();
 
           if (oldPopUp != null) {
-            // _listOfPopUps.remove(oldPopUp);
             popUpListToRemove.add(oldPopUp);
           }
 
@@ -819,18 +818,17 @@ class _IntervalManager with TickerProviderMixin {
   }
 
   void _unpackCompletedDrop() {
-    allIntervals
+    list
         .whereType<_MovingInterval>()
         .where((i) => i.areAnimationsCompleted)
         .toList()
         .forEach((i) {
       _dbgPrint('Mv finished {$i}');
-      i.list!.replace(i.iterable(), i.subList, updateCallback:
-          (_IntervalList list, int index, int oldBuildCount,
-              int newBuildCount) {
+      list.replace(i.iterable(), i.subList, updateCallback: (_IntervalList list,
+          int index, int oldBuildCount, int newBuildCount) {
         addUpdate(index, oldBuildCount, newBuildCount,
             popUpList: i.popUpList,
-            flags: _UpdateFlags(_UpdateFlags.POPUP_DROP));
+            flags: const _UpdateFlags(_UpdateFlags.POPUP_DROP));
       });
       _listOfPopUps.remove(i.popUpList);
     });
@@ -965,11 +963,11 @@ class _IntervalManager with TickerProviderMixin {
           .map<_PopUpList>((e) => e.popUpList)
           .toSet();
 
-      if (!setEquals(popUpLists, listOfPopUps.toSet())) {
-        return false;
-      }
-
-      return debugUpdateConsistency();
+      return setEquals(popUpLists, listOfPopUps.toSet()) &&
+          list
+              .whereType<_WithDropInterval>()
+              .every((e) => e.list == e.dropInterval.list) &&
+          debugUpdateConsistency();
     }());
     return true;
   }
@@ -1029,7 +1027,8 @@ class _IntervalManager with TickerProviderMixin {
     }(), _alwaysUpdateCallback);
     performSplit(interval, result);
     addUpdate(updateIndex, 1, 1,
-        toPopUpList: popUpList, flags: _UpdateFlags(_UpdateFlags.POPUP_PICK));
+        toPopUpList: popUpList,
+        flags: const _UpdateFlags(_UpdateFlags.POPUP_PICK));
 
     reorderLayoutData!.openingInterval = open;
     reorderLayoutData!.currentMainAxisOffset = rld.lastMainAxisOffset;
@@ -1122,7 +1121,7 @@ class _IntervalManager with TickerProviderMixin {
           addUpdate(0, 1, 1,
               popUpList: oldPopUpList,
               toPopUpList: newPopUpList,
-              flags: _UpdateFlags(_UpdateFlags.POPUP_PICK));
+              flags: const _UpdateFlags(_UpdateFlags.POPUP_PICK));
         },
       );
       // closingInterval.startAnimation();
@@ -1134,7 +1133,7 @@ class _IntervalManager with TickerProviderMixin {
         addUpdate(0, 1, 1,
             popUpList: oldPopUpList,
             toPopUpList: newPopUpList,
-            flags: _UpdateFlags(_UpdateFlags.POPUP_PICK));
+            flags: const _UpdateFlags(_UpdateFlags.POPUP_PICK));
         addUpdate(index, oldBuildCount, newBuildCount);
       });
       list.remove(holder.iterable());
