@@ -7,7 +7,7 @@ import 'package:flutter/rendering.dart';
 
 import '../../ticker_mixin.dart';
 
-typedef MorphComparator = bool Function(Widget a, Widget b);
+typedef MorphComparator = bool Function(dynamic a, dynamic b);
 
 /// This widget every time it is rebuilt creates a crossfade effect by making the old [child] widget
 /// disappear and the new one appear.
