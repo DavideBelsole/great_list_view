@@ -163,7 +163,7 @@ abstract class AnimatedRenderSliverMultiBoxAdaptor
     final controller = scrollable.widget.controller;
     if (controller == null || !controller.hasClients) return;
     ScrollUpdateNotification(
-            metrics: controller.position.copyWith(),
+            metrics: controller.positions.last.copyWith(),
             context: childManager,
             scrollDelta: 0,
             dragDetails: null)
@@ -392,9 +392,9 @@ abstract class AnimatedRenderSliverMultiBoxAdaptor
     // scroll up/down as needed while dragging
     var controller = Scrollable.of(childManager).widget.controller;
     if (controller != null) {
-      final position = controller.position;
+      final position = controller.positions.last;
       final delta = _reorderLayoutData!.computeScrollDelta(
-          constraints, controller.position, _reorderLayoutData!.itemSize);
+          constraints, position, _reorderLayoutData!.itemSize);
       if (delta != 0.0) {
         final value = position.pixels + delta;
         WidgetsBinding.instance.addPostFrameCallback((_) {
