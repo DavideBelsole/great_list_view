@@ -1094,6 +1094,8 @@ class AnimatedListController {
 
   BuildContext get context => _interface! as BuildContext;
 
+  bool get isBinded => _interface != null;
+
   bool _debugAssertBinded() {
     assert(() {
       if (_interface == null) {
